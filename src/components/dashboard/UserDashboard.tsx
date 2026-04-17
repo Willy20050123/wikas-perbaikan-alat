@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
   BriefcaseBusiness,
   ClipboardList,
   Clock3,
@@ -12,13 +12,35 @@ import {
 
 export default function UserDashboard() {
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const user = {
     nama: "Nama Pegawai",
     jabatan: "Pegawai",
     role: "USER",
-    unreadNotifications: 3,
   };
+
+  async function handleLogout() {
+    try {
+      setIsLoggingOut(true);
+
+      const response = await fetch("/api/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Logout gagal");
+      }
+
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Gagal logout:", error);
+      alert("Logout gagal. Silakan coba lagi.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden text-white">
@@ -45,18 +67,6 @@ export default function UserDashboard() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white shadow-[0_10px_25px_rgba(2,6,23,0.16)] backdrop-blur-md transition hover:bg-white/15"
-              >
-                <Bell className="h-5 w-5" />
-                {user.unreadNotifications > 0 ? (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                    {user.unreadNotifications}
-                  </span>
-                ) : null}
-              </button>
-
               <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 shadow-[0_10px_25px_rgba(2,6,23,0.16)] backdrop-blur-md md:flex">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15 text-base font-bold text-cyan-100 ring-1 ring-white/10">
                   NP
@@ -78,10 +88,12 @@ export default function UserDashboard() {
 
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout
+                  {isLoggingOut ? "Logout..." : "Logout"}
                 </button>
               </div>
 
