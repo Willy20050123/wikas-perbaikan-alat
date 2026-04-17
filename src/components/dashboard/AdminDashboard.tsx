@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -566,11 +567,16 @@ export default function AdminDashboard({
               <div>
                 <p className="mb-2 text-sm text-white/60">Foto Barang</p>
                 {selectedReport.fotoUrl ? (
-                  <img
-                    src={selectedReport.fotoUrl}
-                    alt={selectedReport.namaBarang}
-                    className="w-full rounded-2xl border border-white/10 object-cover"
-                  />
+                  <div className="overflow-hidden rounded-2xl border border-white/10">
+                    <Image
+                      src={selectedReport.fotoUrl}
+                      alt={selectedReport.namaBarang}
+                      width={1200}
+                      height={800}
+                      className="w-full object-cover"
+                      unoptimized
+                    />
+                  </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-white/50">
                     Tidak ada foto

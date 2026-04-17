@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -210,11 +211,16 @@ export default function CreateReportPage() {
               {previewUrl ? (
                 <div className="md:col-span-2">
                   <p className="mb-2 text-sm font-medium">Preview Foto</p>
-                  <img
-                    src={previewUrl}
-                    alt="Preview upload"
-                    className="max-h-72 rounded-2xl border border-white/10 object-cover"
-                  />
+                  <div className="overflow-hidden rounded-2xl border border-white/10">
+                    <Image
+                      src={previewUrl}
+                      alt="Preview upload"
+                      width={1200}
+                      height={800}
+                      className="max-h-72 w-auto object-cover"
+                      unoptimized
+                    />
+                  </div>
                 </div>
               ) : null}
 

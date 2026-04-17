@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import StatusBadge from "./StatusBadge";
 import {
   formatKategori,
@@ -35,11 +36,16 @@ export default function StatusCard({ report }: StatusCardProps) {
       <div className="grid grid-cols-1 gap-0 lg:grid-cols-[340px_minmax(0,1fr)]">
         <div className="border-b border-white/10 bg-slate-950/30 p-4 lg:border-b-0 lg:border-r">
           {report.fotoUrl ? (
-            <img
-              src={report.fotoUrl}
-              alt={report.namaBarang}
-              className="h-full max-h-[320px] w-full rounded-2xl border border-white/10 object-cover"
-            />
+            <div className="overflow-hidden rounded-2xl border border-white/10">
+              <Image
+                src={report.fotoUrl}
+                alt={report.namaBarang}
+                width={1200}
+                height={900}
+                className="h-full max-h-[320px] w-full object-cover"
+                unoptimized
+              />
+            </div>
           ) : (
             <div className="flex h-[240px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-sm text-white/50">
               Tidak ada foto
@@ -92,8 +98,8 @@ export default function StatusCard({ report }: StatusCardProps) {
                 {report.status === "DISETUJUI"
                   ? `Disetujui pada ${formatTanggal(report.approvedAt || null)}`
                   : report.status === "DITOLAK"
-                  ? `Ditolak pada ${formatTanggal(report.rejectedAt || null)}`
-                  : "Menunggu keputusan admin"}
+                    ? `Ditolak pada ${formatTanggal(report.rejectedAt || null)}`
+                    : "Menunggu keputusan admin"}
               </p>
             </div>
           </div>

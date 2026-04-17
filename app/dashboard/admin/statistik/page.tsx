@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -85,9 +85,11 @@ const STATUS_OPTIONS = [
 export default function AdminStatistikPage() {
   const router = useRouter();
   const now = useMemo(() => new Date(), []);
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
 
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedStatus, setSelectedStatus] = useState<
     ReportStatus | "SEMUA"
   >("SEMUA");
@@ -97,57 +99,63 @@ export default function AdminStatistikPage() {
   const [message, setMessage] = useState("");
 
   const yearOptions = useMemo(() => {
-    return [2026, 2027, 2028, 2029, 2030];
-  }, []);
+    const startYear = 2026;
+    const endYear = Math.max(currentYear + 4, 2030);
 
-  async function loadStats(
-    month = selectedMonth,
-    year = selectedYear,
-    status = selectedStatus
-  ) {
-    try {
-      setLoading(true);
-      setMessage("");
+    return Array.from(
+      { length: endYear - startYear + 1 },
+      (_, index) => startYear + index
+    );
+  }, [currentYear]);
 
-      const params = new URLSearchParams({
-        month: String(month),
-        year: String(year),
-      });
+  const loadStats = useCallback(
+    async (
+      month: number = selectedMonth,
+      year: number = selectedYear,
+      status: ReportStatus | "SEMUA" = selectedStatus
+    ) => {
+      try {
+        setLoading(true);
+        setMessage("");
 
-      if (status !== "SEMUA") {
-        params.set("status", status);
-      }
+        const params = new URLSearchParams({
+          month: String(month),
+          year: String(year),
+        });
 
-      const res = await fetch(`/api/reports/stats/monthly?${params.toString()}`, {
-        cache: "no-store",
-      });
+        if (status !== "SEMUA") {
+          params.set("status", status);
+        }
 
-      const data = await res.json();
+        const res = await fetch(`/api/reports/stats/monthly?${params.toString()}`, {
+          cache: "no-store",
+        });
 
-      if (!res.ok) {
-        setMessage(data.message || "Gagal memuat statistik bulanan.");
+        const data = await res.json();
+
+        if (!res.ok) {
+          setMessage(data.message || "Gagal memuat statistik bulanan.");
+          setStats(null);
+          return;
+        }
+
+        setStats(data);
+      } catch (error) {
+        console.error("LOAD_MONTHLY_STATS_ERROR:", error);
+        setMessage("Terjadi kesalahan saat memuat statistik bulanan.");
         setStats(null);
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      setStats(data);
-    } catch (error) {
-      console.error("LOAD_MONTHLY_STATS_ERROR:", error);
-      setMessage("Terjadi kesalahan saat memuat statistik bulanan.");
-      setStats(null);
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [selectedMonth, selectedYear, selectedStatus]
+  );
 
   function handleApplyFilter() {
     void loadStats(selectedMonth, selectedYear, selectedStatus);
   }
 
   function handleResetFilter() {
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-
     setSelectedMonth(currentMonth);
     setSelectedYear(currentYear);
     setSelectedStatus("SEMUA");
@@ -155,8 +163,8 @@ export default function AdminStatistikPage() {
   }
 
   useEffect(() => {
-    void loadStats(now.getMonth() + 1, now.getFullYear(), "SEMUA");
-  }, [now]);
+    void loadStats(currentMonth, currentYear, "SEMUA");
+  }, [loadStats, currentMonth, currentYear]);
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">

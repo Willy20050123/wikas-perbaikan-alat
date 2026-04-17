@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -246,11 +247,16 @@ export default function AdminHistoryPage() {
                         <p className="mb-3 text-sm text-white/55">Foto Barang</p>
 
                         {report.fotoUrl ? (
-                          <img
-                            src={report.fotoUrl}
-                            alt={report.namaBarang}
-                            className="w-full rounded-2xl border border-white/10 object-cover"
-                          />
+                          <div className="overflow-hidden rounded-2xl border border-white/10">
+                            <Image
+                              src={report.fotoUrl}
+                              alt={report.namaBarang}
+                              width={1200}
+                              height={800}
+                              className="w-full object-cover"
+                              unoptimized
+                            />
+                          </div>
                         ) : (
                           <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-white/50">
                             Tidak ada foto
