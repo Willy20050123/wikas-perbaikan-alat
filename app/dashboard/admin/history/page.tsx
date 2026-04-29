@@ -7,8 +7,10 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  ClipboardCheck,
   XCircle,
   ArrowLeft,
+  Wrench,
 } from "lucide-react";
 import {
   formatKategori,
@@ -29,15 +31,22 @@ type ReportItem = {
   deskripsi: string;
   severity: ReportSeverity;
   fotoUrl: string | null;
+  completionPhotoUrl?: string | null;
   status: ReportStatus;
   alasanPenolakan: string | null;
+  assignedTechnician?: string | null;
+  adminNotes?: string | null;
+  completionNotes?: string | null;
   createdAt: string;
   approvedAt?: string | null;
   rejectedAt?: string | null;
+  processedAt?: string | null;
+  finishedAt?: string | null;
   user: {
     id: number;
     nama: string;
-    email: string;
+    jabatan?: string | null;
+    nip: string | null;
   };
 };
 
@@ -117,7 +126,7 @@ export default function AdminHistoryPage() {
         </div>
 
         <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Disetujui
             </p>
@@ -125,7 +134,7 @@ export default function AdminHistoryPage() {
             <p className="mt-3 text-sm text-white/60">Laporan diterima admin.</p>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Ditolak
             </p>
@@ -133,7 +142,7 @@ export default function AdminHistoryPage() {
             <p className="mt-3 text-sm text-white/60">Laporan yang ditolak admin.</p>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Diproses
             </p>
@@ -141,7 +150,7 @@ export default function AdminHistoryPage() {
             <p className="mt-3 text-sm text-white/60">Sedang ditindaklanjuti.</p>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Selesai
             </p>
@@ -156,7 +165,7 @@ export default function AdminHistoryPage() {
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.08] shadow-[0_24px_60px_rgba(2,6,23,0.16)] backdrop-blur-2xl">
+        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.08] shadow-[0_24px_60px_rgba(2,6,23,0.16)]">
           <div className="border-b border-white/10 px-6 py-5">
             <h2 className="text-2xl font-bold text-white">Arsip Laporan</h2>
           </div>
@@ -198,8 +207,13 @@ export default function AdminHistoryPage() {
                           <p className="mt-1 font-semibold text-white">
                             {report.user.nama}
                           </p>
+                          {report.user.jabatan ? (
+                            <p className="mt-1 text-sm text-white/55">
+                              {report.user.jabatan}
+                            </p>
+                          ) : null}
                           <p className="mt-1 text-sm text-white/55">
-                            {report.user.email}
+                            NIP: {report.user.nip || "-"}
                           </p>
                         </div>
 
@@ -240,6 +254,48 @@ export default function AdminHistoryPage() {
                           </p>
                         </div>
                       ) : null}
+
+                      {report.assignedTechnician ||
+                      report.adminNotes ||
+                      report.completionNotes ? (
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {report.assignedTechnician ? (
+                            <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4">
+                              <div className="flex items-center gap-2 text-amber-100">
+                                <Wrench className="h-4 w-4" />
+                                <p className="text-sm font-semibold">
+                                  Penanggung Jawab
+                                </p>
+                              </div>
+                              <p className="mt-2 text-amber-50/90">
+                                {report.assignedTechnician}
+                              </p>
+                            </div>
+                          ) : null}
+
+                          {report.adminNotes ? (
+                            <div className="rounded-2xl border border-cyan-300/18 bg-cyan-400/10 p-4">
+                              <p className="text-sm font-semibold text-cyan-50">
+                                Catatan Internal
+                              </p>
+                              <p className="mt-2 whitespace-pre-line text-cyan-50/90">
+                                {report.adminNotes}
+                              </p>
+                            </div>
+                          ) : null}
+
+                          {report.completionNotes ? (
+                            <div className="rounded-2xl border border-emerald-300/18 bg-emerald-400/10 p-4">
+                              <p className="text-sm font-semibold text-emerald-50">
+                                Catatan Penyelesaian
+                              </p>
+                              <p className="mt-2 whitespace-pre-line text-emerald-50/90">
+                                {report.completionNotes}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="w-full lg:max-w-[320px]">
@@ -263,6 +319,24 @@ export default function AdminHistoryPage() {
                           </div>
                         )}
 
+                        {report.completionPhotoUrl ? (
+                          <div className="mt-4">
+                            <p className="mb-3 text-sm text-white/55">
+                              Foto Penyelesaian
+                            </p>
+                            <div className="overflow-hidden rounded-2xl border border-emerald-300/15">
+                              <Image
+                                src={report.completionPhotoUrl}
+                                alt={`Penyelesaian ${report.namaBarang}`}
+                                width={1200}
+                                height={800}
+                                className="w-full object-cover"
+                                unoptimized
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                             <CalendarDays className="h-4 w-4 text-white/60" />
@@ -274,7 +348,7 @@ export default function AdminHistoryPage() {
                             </div>
                           </div>
 
-                          {report.status === "DISETUJUI" ? (
+                          {report.approvedAt ? (
                             <div className="flex items-center gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3">
                               <CheckCircle2 className="h-4 w-4 text-emerald-100" />
                               <div>
@@ -286,7 +360,7 @@ export default function AdminHistoryPage() {
                             </div>
                           ) : null}
 
-                          {report.status === "DITOLAK" ? (
+                          {report.rejectedAt ? (
                             <div className="flex items-center gap-3 rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3">
                               <XCircle className="h-4 w-4 text-rose-100" />
                               <div>
@@ -298,13 +372,25 @@ export default function AdminHistoryPage() {
                             </div>
                           ) : null}
 
-                          {report.status === "DIPROSES" ? (
+                          {report.processedAt ? (
                             <div className="flex items-center gap-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3">
                               <Clock3 className="h-4 w-4 text-amber-100" />
                               <div>
-                                <p className="text-xs text-amber-100/70">Diproses</p>
+                                <p className="text-xs text-amber-100/70">Mulai Proses</p>
                                 <p className="text-sm font-semibold text-amber-50">
-                                  Sedang ditindaklanjuti
+                                  {formatTanggal(report.processedAt)}
+                                </p>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {report.finishedAt ? (
+                            <div className="flex items-center gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3">
+                              <ClipboardCheck className="h-4 w-4 text-emerald-100" />
+                              <div>
+                                <p className="text-xs text-emerald-100/70">Selesai</p>
+                                <p className="text-sm font-semibold text-emerald-50">
+                                  {formatTanggal(report.finishedAt)}
                                 </p>
                               </div>
                             </div>

@@ -1,0 +1,111 @@
+import "server-only";
+
+import { cache } from "react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import {
+  AUTH_COOKIE_NAME,
+  createAuthSessionTag,
+  verifyAuthToken,
+} from "@/src/lib/auth";
+import {
+  findUserByIdRaw,
+  type SessionUserRow,
+  type SessionUserWithPasswordRow,
+} from "@/src/lib/raw-data";
+
+export type SessionUser = Awaited<ReturnType<typeof getSessionUser>>;
+
+function stripPasswordHash(user: SessionUserWithPasswordRow): SessionUserRow {
+  return {
+    id: user.id,
+    nama: user.nama,
+    jabatan: user.jabatan,
+    nip: user.nip,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
+function hasValidSessionTag(
+  user: SessionUserWithPasswordRow,
+  sessionTag: string
+) {
+  return (
+    createAuthSessionTag({
+      passwordHash: user.passwordHash,
+      role: user.role,
+    }) === sessionTag
+  );
+}
+
+export const getSessionUser = cache(async () => {
+  const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = verifyAuthToken(token);
+
+  if (!payload) {
+    return null;
+  }
+
+  const user = await findUserByIdRaw(payload.userId, true);
+
+  if (!user || !hasValidSessionTag(user, payload.sessionTag)) {
+    return null;
+  }
+
+  return stripPasswordHash(user);
+});
+
+export async function requireSessionUser() {
+  const user = await getSessionUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return user;
+}
+
+export async function requireRole<Role extends "ADMIN" | "USER">(role: Role) {
+  const user = await requireSessionUser();
+
+  if (user.role !== role) {
+    redirect(user.role === "ADMIN" ? "/dashboard/admin" : "/dashboard/user");
+  }
+
+  return user as NonNullable<Awaited<ReturnType<typeof getSessionUser>>> & {
+    role: Role;
+  };
+}
+
+export async function getApiSessionUser() {
+  const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = verifyAuthToken(token);
+
+  if (!payload) {
+    return null;
+  }
+
+  const user = await findUserByIdRaw(payload.userId, true);
+
+  if (!user || !hasValidSessionTag(user, payload.sessionTag)) {
+    return null;
+  }
+
+  return user;
+}
+
+export function getDefaultRedirectForRole(role: "ADMIN" | "USER") {
+  return role === "ADMIN" ? "/dashboard/admin" : "/dashboard/user";
+}

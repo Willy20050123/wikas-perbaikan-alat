@@ -1,14 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import {
   Activity,
   BadgeCheck,
   BarChart3,
   CheckCircle2,
   Clock3,
-  Trophy,
-  UserRound,
+  LayoutGrid,
   Users,
   XCircle,
 } from "lucide-react";
@@ -23,16 +22,6 @@ type MonthlySummary = {
   totalProcessed: number;
   totalFinished: number;
 };
-
-type TopReporter = {
-  userId: number;
-  nama: string;
-  email: string;
-  totalReports: number;
-  lastStatus: ReportStatus;
-  topCategory: string;
-  latestReportAt: string;
-} | null;
 
 type CategoryItem = {
   key: string;
@@ -52,48 +41,38 @@ type MonthlyStatsCardsProps = {
   summary: MonthlySummary;
   categories: CategoryItem[];
   statusBreakdown: StatusItem[];
-  topReporter: TopReporter;
 };
 
-type StatCardProps = {
+type StatTileProps = {
   title: string;
-  value: number | string;
+  value: number;
   description: string;
   icon: ReactNode;
-  iconWrapperClass: string;
-  glowClass: string;
+  accentClass: string;
 };
 
-function StatCard({
+function StatTile({
   title,
   value,
   description,
   icon,
-  iconWrapperClass,
-  glowClass,
-}: StatCardProps) {
+  accentClass,
+}: StatTileProps) {
   return (
-    <div
-      className={`rounded-[28px] border border-white/12 bg-white/[0.08] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.16)] backdrop-blur-xl ${glowClass}`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
-            {title}
-          </p>
-          <p className="mt-3 text-5xl font-extrabold tracking-[-0.03em] text-white">
-            {value}
-          </p>
-        </div>
-
-        <div
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${iconWrapperClass}`}
-        >
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.07] p-4 shadow-[0_18px_40px_rgba(2,6,23,0.16)] sm:rounded-[26px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${accentClass}`}>
           {icon}
         </div>
+        <p className="text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">
+          {value}
+        </p>
       </div>
 
-      <p className="mt-4 text-sm text-white/60">{description}</p>
+      <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/55">
+        {title}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-white/62">{description}</p>
     </div>
   );
 }
@@ -106,310 +85,231 @@ function getStatusDotClass(statusKey: string) {
   return "bg-blue-300";
 }
 
-function getBarClass(index: number) {
-  const classes = [
-    "bg-gradient-to-b from-emerald-300 to-cyan-400",
-    "bg-gradient-to-b from-amber-300 to-yellow-500",
-    "bg-gradient-to-b from-blue-300 to-indigo-500",
-  ];
-
-  return classes[index] || "bg-gradient-to-b from-cyan-300 to-blue-500";
+function getStatusBarClass(statusKey: string) {
+  if (statusKey === "DISETUJUI") return "bg-emerald-300";
+  if (statusKey === "DITOLAK") return "bg-rose-300";
+  if (statusKey === "MENUNGGU") return "bg-amber-300";
+  if (statusKey === "DIPROSES") return "bg-cyan-300";
+  return "bg-blue-300";
 }
 
-export default function MonthlyStatsCards({
+function MonthlyStatsCards({
   monthLabel,
   selectedStatus,
   summary,
   categories,
   statusBreakdown,
-  topReporter,
 }: MonthlyStatsCardsProps) {
   const totalStatus = statusBreakdown.reduce((sum, item) => sum + item.total, 0);
-
   const maxCategory =
     categories.length > 0 ? Math.max(...categories.map((item) => item.total), 1) : 1;
-
   const approvalRate =
     summary.totalReports > 0
       ? Math.round((summary.totalApproved / summary.totalReports) * 100)
       : 0;
+  const dominantStatus =
+    statusBreakdown.length > 0
+      ? [...statusBreakdown].sort((a, b) => b.total - a.total)[0]
+      : null;
 
   return (
-    <section className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
-          Statistik Bulanan
+    <section className="space-y-4">
+      <div className="rounded-[28px] border border-cyan-300/12 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] p-4 shadow-[0_24px_60px_rgba(2,6,23,0.18)] sm:rounded-[32px] sm:p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
+          Panel Ringkasan
         </p>
-        <h2 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-white md:text-4xl">
-          Ringkasan Laporan {monthLabel}
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-white">
+          Snapshot {monthLabel}
         </h2>
-        <p className="mt-3 max-w-3xl text-white/70">
-          Rekap laporan berdasarkan periode terpilih, termasuk jumlah pelapor
-          unik, distribusi status, kategori terbanyak, dan pelapor paling aktif.
+        <p className="mt-3 text-sm leading-6 text-white/68">
+          Ringkasan cepat untuk periode aktif, lengkap dengan kategori,
+          distribusi status, dan rasio persetujuan.
         </p>
-        <div className="mt-4 inline-flex rounded-full border border-cyan-300/18 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-50">
-          Filter status:{" "}
-          <span className="ml-2">{selectedStatus === "SEMUA" ? "Semua Status" : formatStatus(selectedStatus)}</span>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <span className="inline-flex rounded-full border border-cyan-300/18 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-50">
+            {selectedStatus === "SEMUA"
+              ? "Semua Status"
+              : formatStatus(selectedStatus)}
+          </span>
+          <span className="inline-flex rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/82">
+            {summary.totalReports} laporan
+          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <StatTile
           title="Total Laporan"
           value={summary.totalReports}
-          description="Semua laporan pada periode terpilih."
+          description="Semua laporan pada periode aktif."
           icon={<BarChart3 className="h-5 w-5 text-cyan-100" />}
-          iconWrapperClass="border-cyan-300/18 bg-cyan-400/10"
-          glowClass="shadow-[0_0_0_1px_rgba(34,211,238,0.10),0_18px_40px_rgba(2,6,23,0.22)]"
+          accentClass="border-cyan-300/18 bg-cyan-400/10"
         />
-
-        <StatCard
+        <StatTile
           title="Pelapor Unik"
           value={summary.totalUniqueReporters}
-          description="Jumlah pegawai yang membuat laporan."
+          description="Pegawai berbeda yang melapor."
           icon={<Users className="h-5 w-5 text-emerald-100" />}
-          iconWrapperClass="border-emerald-300/18 bg-emerald-400/10"
-          glowClass="shadow-[0_0_0_1px_rgba(52,211,153,0.10),0_18px_40px_rgba(2,6,23,0.22)]"
+          accentClass="border-emerald-300/18 bg-emerald-400/10"
         />
-
-        <StatCard
+        <StatTile
           title="Disetujui"
           value={summary.totalApproved}
-          description="Data laporan yang diterima admin."
+          description="Laporan yang lolos verifikasi."
           icon={<BadgeCheck className="h-5 w-5 text-emerald-100" />}
-          iconWrapperClass="border-emerald-300/18 bg-emerald-400/10"
-          glowClass="shadow-[0_0_0_1px_rgba(74,222,128,0.10),0_18px_40px_rgba(2,6,23,0.22)]"
+          accentClass="border-emerald-300/18 bg-emerald-400/10"
         />
-
-        <StatCard
+        <StatTile
           title="Ditolak"
           value={summary.totalRejected}
-          description="Laporan yang ditolak admin."
+          description="Laporan yang tidak dilanjutkan."
           icon={<XCircle className="h-5 w-5 text-rose-100" />}
-          iconWrapperClass="border-rose-300/18 bg-rose-400/10"
-          glowClass="shadow-[0_0_0_1px_rgba(251,113,133,0.10),0_18px_40px_rgba(2,6,23,0.22)]"
+          accentClass="border-rose-300/18 bg-rose-400/10"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <StatCard
-          title="Menunggu"
-          value={summary.totalWaiting}
-          description="Menunggu keputusan admin."
-          icon={<Clock3 className="h-5 w-5 text-amber-100" />}
-          iconWrapperClass="border-amber-300/18 bg-amber-400/10"
-          glowClass=""
-        />
-
-        <StatCard
-          title="Diproses"
-          value={summary.totalProcessed}
-          description="Sedang ditindaklanjuti."
-          icon={<Activity className="h-5 w-5 text-cyan-100" />}
-          iconWrapperClass="border-cyan-300/18 bg-cyan-400/10"
-          glowClass=""
-        />
-
-        <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.16)] backdrop-blur-xl">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-100/75">
-                Pelapor Terbanyak
-              </p>
-              <p className="mt-3 text-2xl font-extrabold text-white">
-                {topReporter?.nama || "-"}
-              </p>
-            </div>
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/18 bg-amber-400/10">
-              <Trophy className="h-5 w-5 text-amber-100" />
-            </div>
-          </div>
-
-          <p className="mt-3 text-sm text-white/60">
-            {topReporter
-              ? `${topReporter.totalReports} laporan • ${topReporter.topCategory}`
-              : "Belum ada data pelapor bulan ini."}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-4 sm:rounded-[24px]">
+          <Clock3 className="h-5 w-5 text-amber-100" />
+          <p className="mt-3 text-2xl font-black tracking-[-0.03em] text-white">
+            {summary.totalWaiting}
           </p>
+          <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/55">
+            Menunggu
+          </p>
+        </div>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-white/55">Status terakhir</p>
-            <p className="mt-1 font-semibold text-white">
-              {topReporter ? formatStatus(topReporter.lastStatus) : "-"}
-            </p>
-          </div>
+        <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-4 sm:rounded-[24px]">
+          <Activity className="h-5 w-5 text-cyan-100" />
+          <p className="mt-3 text-2xl font-black tracking-[-0.03em] text-white">
+            {summary.totalProcessed}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/55">
+            Diproses
+          </p>
+        </div>
+
+        <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-4 sm:rounded-[24px]">
+          <CheckCircle2 className="h-5 w-5 text-blue-100" />
+          <p className="mt-3 text-2xl font-black tracking-[-0.03em] text-white">
+            {summary.totalFinished}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/55">
+            Selesai
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.25fr_1fr_1fr]">
-        <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.16)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="text-2xl font-bold text-white">
-              Jumlah Laporan per Kategori
-            </h3>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
-              <BarChart3 className="h-5 w-5 text-white/80" />
-            </div>
-          </div>
-
-          <div className="mt-8 grid h-[260px] grid-cols-3 items-end gap-6">
-            {categories.map((item, index) => {
-              const height =
-                item.total > 0 ? Math.max((item.total / maxCategory) * 180, 24) : 8;
-
-              return (
-                <div key={item.key} className="flex flex-col items-center gap-4">
-                  <div className="text-sm font-semibold text-white/80">
-                    {item.total}
-                  </div>
-                  <div className="flex h-[180px] items-end">
-                    <div
-                      className={`w-16 rounded-t-2xl shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${getBarClass(
-                        index
-                      )}`}
-                      style={{ height }}
-                    />
-                  </div>
-                  <div className="text-center text-sm leading-5 text-white/70">
-                    {item.label}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.16)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="text-2xl font-bold text-white">Status Laporan</h3>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
-              <CheckCircle2 className="h-5 w-5 text-white/80" />
-            </div>
-          </div>
-
-          <div className="mt-8 flex flex-col items-center">
-            <div className="relative flex h-48 w-48 items-center justify-center rounded-full border-[16px] border-cyan-400/15">
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `conic-gradient(
-                    rgba(45,212,191,0.95) 0deg ${
-                      totalStatus > 0
-                        ? (statusBreakdown[0]?.total || 0) / totalStatus * 360
-                        : 0
-                    }deg,
-                    rgba(251,113,133,0.95) ${
-                      totalStatus > 0
-                        ? (statusBreakdown[0]?.total || 0) / totalStatus * 360
-                        : 0
-                    }deg ${
-                      totalStatus > 0
-                        ? ((statusBreakdown[0]?.total || 0) +
-                            (statusBreakdown[1]?.total || 0)) /
-                            totalStatus *
-                            360
-                        : 0
-                    }deg,
-                    rgba(252,211,77,0.95) ${
-                      totalStatus > 0
-                        ? ((statusBreakdown[0]?.total || 0) +
-                            (statusBreakdown[1]?.total || 0)) /
-                            totalStatus *
-                            360
-                        : 0
-                    }deg ${
-                      totalStatus > 0
-                        ? ((statusBreakdown[0]?.total || 0) +
-                            (statusBreakdown[1]?.total || 0) +
-                            (statusBreakdown[2]?.total || 0)) /
-                            totalStatus *
-                            360
-                        : 0
-                    }deg,
-                    rgba(56,189,248,0.95) ${
-                      totalStatus > 0
-                        ? ((statusBreakdown[0]?.total || 0) +
-                            (statusBreakdown[1]?.total || 0) +
-                            (statusBreakdown[2]?.total || 0)) /
-                            totalStatus *
-                            360
-                        : 0
-                    }deg 360deg
-                  )`,
-                }}
-              />
-              <div className="absolute inset-[18px] rounded-full bg-slate-950" />
-              <div className="relative z-10 text-center">
-                <p className="text-5xl font-extrabold text-white">
-                  {summary.totalReports}
-                </p>
-                <p className="mt-1 text-sm text-white/60">Laporan</p>
-              </div>
-            </div>
-
-            <div className="mt-8 w-full space-y-3">
-              {statusBreakdown.slice(0, 4).map((item) => (
-                <div
-                  key={item.key}
-                  className="flex items-center justify-between gap-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`h-3 w-3 rounded-full ${getStatusDotClass(item.key)}`}
-                    />
-                    <span className="text-lg text-white/85">{item.label}</span>
-                  </div>
-                  <span className="text-lg font-semibold text-white">
-                    {item.total}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.16)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="text-2xl font-bold text-white">Status Laporan</h3>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
-              <UserRound className="h-5 w-5 text-white/80" />
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-5">
-            {statusBreakdown.map((item) => {
-              const percent =
-                totalStatus > 0 ? Math.round((item.total / totalStatus) * 100) : 0;
-
-              return (
-                <div key={item.key} className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`h-3 w-3 rounded-full ${getStatusDotClass(item.key)}`}
-                    />
-                    <span className="text-lg text-white/85">{item.label}</span>
-                  </div>
-                  <span className="text-xl font-semibold text-white">
-                    {percent}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-8 rounded-2xl border border-emerald-300/15 bg-emerald-400/10 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/75">
-              Approval Rate
+      <div className="rounded-[24px] border border-white/10 bg-white/[0.07] p-4 shadow-[0_18px_40px_rgba(2,6,23,0.16)] sm:rounded-[28px] sm:p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/52">
+              Komposisi Kategori
             </p>
-            <p className="mt-2 text-3xl font-extrabold text-white">
+            <h3 className="mt-1 text-xl font-bold text-white">
+              Laporan per Kategori
+            </h3>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
+            <LayoutGrid className="h-5 w-5 text-white/80" />
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {categories.map((item, index) => {
+            const width = maxCategory > 0 ? (item.total / maxCategory) * 100 : 0;
+            const barClass =
+              index === 0
+                ? "bg-emerald-300"
+                : index === 1
+                  ? "bg-amber-300"
+                  : "bg-blue-300";
+
+            return (
+              <div key={item.key}>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-white/82">{item.label}</span>
+                  <span className="font-semibold text-white">{item.total}</span>
+                </div>
+                <div className="mt-2 h-2.5 rounded-full bg-white/7">
+                  <div
+                    className={`h-2.5 rounded-full ${barClass}`}
+                    style={{ width: `${Math.max(width, item.total > 0 ? 10 : 0)}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-[24px] border border-white/10 bg-white/[0.07] p-4 shadow-[0_18px_40px_rgba(2,6,23,0.16)] sm:rounded-[28px] sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/52">
+              Distribusi Status
+            </p>
+            <h3 className="mt-1 text-xl font-bold text-white">
+              Ringkasan Progres
+            </h3>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 px-4 py-3 text-right">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-100/75">
+              Approval
+            </p>
+            <p className="mt-1 text-xl font-black tracking-[-0.03em] text-white sm:text-2xl">
               {approvalRate}%
             </p>
-            <p className="mt-2 text-sm text-white/60">
-              Persentase laporan yang berhasil disetujui.
+          </div>
+        </div>
+
+        {dominantStatus ? (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
+            <p className="text-xs uppercase tracking-[0.22em] text-white/45">
+              Status Dominan
+            </p>
+            <p className="mt-2 text-lg font-semibold text-white">
+              {dominantStatus.label}
             </p>
           </div>
+        ) : null}
+
+        <div className="mt-5 space-y-4">
+          {statusBreakdown.map((item) => {
+            const percent =
+              totalStatus > 0 ? Math.round((item.total / totalStatus) * 100) : 0;
+
+            return (
+              <div key={item.key}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`h-3 w-3 rounded-full ${getStatusDotClass(item.key)}`}
+                    />
+                    <span className="font-medium text-white/82">{item.label}</span>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="font-semibold text-white">{item.total}</p>
+                    <p className="text-xs text-white/45">{percent}%</p>
+                  </div>
+                </div>
+
+                <div className="mt-2 h-2 rounded-full bg-white/7">
+                  <div
+                    className={`h-2 rounded-full ${getStatusBarClass(item.key)}`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
   );
 }
+
+export default memo(MonthlyStatsCards);

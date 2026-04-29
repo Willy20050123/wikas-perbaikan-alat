@@ -1,0 +1,524 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  KeyRound,
+  RefreshCcw,
+  Save,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+
+type UserItem = {
+  id: number;
+  nama: string;
+  jabatan: string | null;
+  nip: string | null;
+  role: "ADMIN" | "USER";
+  createdAt: string;
+  _count: {
+    reports: number;
+  };
+};
+
+type DraftMap = Record<
+  number,
+  {
+    nama: string;
+    jabatan: string;
+    nip: string;
+    role: "ADMIN" | "USER";
+  }
+>;
+
+type AdminUsersPageProps = {
+  currentUserId: number;
+};
+
+export default function AdminUsersPage({
+  currentUserId,
+}: AdminUsersPageProps) {
+  const router = useRouter();
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [drafts, setDrafts] = useState<DraftMap>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [createdPassword, setCreatedPassword] = useState("");
+  const [newUser, setNewUser] = useState({
+    nama: "",
+    jabatan: "",
+    nip: "",
+    role: "USER" as "ADMIN" | "USER",
+    password: "",
+  });
+
+  async function loadUsers() {
+    try {
+      setLoading(true);
+      setMessage("");
+
+      const res = await fetch("/api/admin/users", {
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data.message || "Gagal memuat daftar user.");
+        return;
+      }
+
+      const loadedUsers = data.users || [];
+      setUsers(loadedUsers);
+      setDrafts(
+        Object.fromEntries(
+          loadedUsers.map((user: UserItem) => [
+            user.id,
+            {
+              nama: user.nama,
+              jabatan: user.jabatan || "",
+              nip: user.nip || "",
+              role: user.role,
+            },
+          ])
+        )
+      );
+    } catch (error) {
+      console.error("LOAD_ADMIN_USERS_ERROR:", error);
+      setMessage("Terjadi kesalahan saat memuat daftar user.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  async function handleCreateUser() {
+    try {
+      setMessage("");
+      setCreatedPassword("");
+
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      const data = await res.json();
+      setMessage(data.message || "User berhasil dibuat.");
+
+      if (!res.ok) {
+        return;
+      }
+
+      setCreatedPassword(data.generatedPassword || "");
+      setNewUser({
+        nama: "",
+        jabatan: "",
+        nip: "",
+        role: "USER",
+        password: "",
+      });
+      await loadUsers();
+    } catch (error) {
+      console.error("CREATE_ADMIN_USER_ERROR:", error);
+      setMessage("Terjadi kesalahan saat membuat user.");
+    }
+  }
+
+  async function handleSaveUser(userId: number) {
+    const draft = drafts[userId];
+
+    if (!draft) {
+      return;
+    }
+
+    try {
+      setMessage("");
+      setCreatedPassword("");
+
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(draft),
+      });
+
+      const data = await res.json();
+      setMessage(data.message || "User berhasil diperbarui.");
+
+      if (res.ok) {
+        await loadUsers();
+      }
+    } catch (error) {
+      console.error("UPDATE_ADMIN_USER_ERROR:", error);
+      setMessage("Terjadi kesalahan saat memperbarui user.");
+    }
+  }
+
+  async function handleResetPassword(userId: number) {
+    try {
+      setMessage("");
+      setCreatedPassword("");
+
+      const res = await fetch(`/api/admin/users/${userId}/password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+      setMessage(data.message || "Password user berhasil direset.");
+      setCreatedPassword(data.generatedPassword || "");
+    } catch (error) {
+      console.error("RESET_ADMIN_USER_PASSWORD_ERROR:", error);
+      setMessage("Terjadi kesalahan saat mereset password user.");
+    }
+  }
+
+  async function handleDeleteUser(userId: number) {
+    const confirmed = window.confirm(
+      "Hapus user ini? Tindakan ini tidak bisa dibatalkan."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setMessage("");
+      setCreatedPassword("");
+
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      setMessage(data.message || "User berhasil dihapus.");
+
+      if (res.ok) {
+        setUsers((current) => current.filter((user) => user.id !== userId));
+        setDrafts((current) => {
+          const next = { ...current };
+          delete next[userId];
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error("DELETE_ADMIN_USER_ERROR:", error);
+      setMessage("Terjadi kesalahan saat menghapus user.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
+              Admin Panel
+            </p>
+            <h1 className="mt-2 text-3xl font-bold md:text-5xl">Kelola User</h1>
+            <p className="mt-3 max-w-3xl text-white/70">
+              Buat akun pegawai atau admin baru, perbarui identitas internal, dan reset password tanpa memakai script manual.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => void loadUsers()}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/15"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Muat Ulang
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/admin")}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/15"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Kembali ke Dashboard
+            </button>
+          </div>
+        </div>
+
+        {message ? (
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm">
+            {message}
+          </div>
+        ) : null}
+
+        {createdPassword ? (
+          <div className="mb-6 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-50">
+            Password sementara: <span className="font-bold">{createdPassword}</span>
+          </div>
+        ) : null}
+
+        <section className="mb-8 rounded-[32px] border border-white/10 bg-white/[0.08] p-6 shadow-[0_24px_60px_rgba(2,6,23,0.16)]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/18 bg-cyan-400/10">
+              <UserPlus className="h-6 w-6 text-cyan-100" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Tambah User</h2>
+              <p className="text-sm text-white/60">
+                Buat akun baru untuk pegawai atau admin.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
+            <input
+              value={newUser.nama}
+              onChange={(event) =>
+                setNewUser((current) => ({ ...current, nama: event.target.value }))
+              }
+              placeholder="Nama"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
+            />
+
+            <input
+              value={newUser.jabatan}
+              onChange={(event) =>
+                setNewUser((current) => ({ ...current, jabatan: event.target.value }))
+              }
+              placeholder="Jabatan"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
+            />
+
+            <input
+              value={newUser.nip}
+              onChange={(event) =>
+                setNewUser((current) => ({ ...current, nip: event.target.value }))
+              }
+              placeholder="NIP"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
+            />
+
+            <select
+              value={newUser.role}
+              onChange={(event) =>
+                setNewUser((current) => ({
+                  ...current,
+                  role: event.target.value as "ADMIN" | "USER",
+                }))
+              }
+              className="h-14 rounded-2xl border border-white/10 bg-slate-900/80 px-4 text-white outline-none"
+            >
+              <option value="USER">USER</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+
+            <input
+              value={newUser.password}
+              onChange={(event) =>
+                setNewUser((current) => ({ ...current, password: event.target.value }))
+              }
+              placeholder="Password opsional"
+              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCreateUser}
+            className="mt-5 inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 font-semibold text-white transition hover:bg-cyan-400"
+          >
+            <UserPlus className="h-4 w-4" />
+            Buat User
+          </button>
+        </section>
+
+        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.08] shadow-[0_24px_60px_rgba(2,6,23,0.16)]">
+          <div className="border-b border-white/10 px-6 py-5">
+            <h2 className="text-2xl font-bold text-white">Daftar User</h2>
+          </div>
+
+          {loading ? (
+            <div className="px-6 py-8 text-white/70">Memuat daftar user...</div>
+          ) : users.length === 0 ? (
+            <div className="px-6 py-8 text-white/70">Belum ada user.</div>
+          ) : (
+            <div className="space-y-4 p-6">
+              {users.map((user) => {
+                const draft = drafts[user.id] || {
+                  nama: user.nama,
+                  jabatan: user.jabatan || "",
+                  nip: user.nip || "",
+                  role: user.role,
+                };
+
+                return (
+                  <div
+                    key={user.id}
+                    className="rounded-[28px] border border-white/10 bg-white/[0.05] p-5"
+                  >
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr_180px_auto]">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-white/55">NIP</p>
+                          <p className="mt-1 font-semibold text-white">
+                            {user.nip || "-"}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-white/55">Jabatan</p>
+                          <p className="mt-1 font-semibold text-white">
+                            {user.jabatan || "-"}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                          <div>
+                            <label className="mb-2 block text-sm text-white/60">
+                              Nama
+                            </label>
+                            <input
+                              value={draft.nama}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: {
+                                    ...draft,
+                                    nama: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm text-white/60">
+                              NIP
+                            </label>
+                            <input
+                              value={draft.nip}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: {
+                                    ...draft,
+                                    nip: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm text-white/60">
+                              Jabatan
+                            </label>
+                            <input
+                              value={draft.jabatan}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: {
+                                    ...draft,
+                                    jabatan: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <p className="text-sm text-white/55">Role</p>
+                          <select
+                            value={draft.role}
+                            onChange={(event) =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [user.id]: {
+                                  ...draft,
+                                  role: event.target.value as "ADMIN" | "USER",
+                                },
+                              }))
+                            }
+                            className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 text-white outline-none"
+                          >
+                            <option value="USER">USER</option>
+                            <option value="ADMIN">ADMIN</option>
+                          </select>
+                        </div>
+
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <p className="text-sm text-white/55">Jumlah Laporan</p>
+                          <p className="mt-2 text-2xl font-bold text-white">
+                            {user._count.reports}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <p className="text-sm text-white/55">Status Penghapusan</p>
+                        <p className="mt-2 text-sm text-white/75">
+                          {user._count.reports > 0
+                            ? "Tidak dapat dihapus karena sudah memiliki laporan."
+                            : user.id === currentUserId
+                              ? "Akun admin aktif tidak bisa dihapus."
+                              : "Aman untuk dihapus bila memang tidak digunakan."}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveUser(user.id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-400"
+                        >
+                          <Save className="h-4 w-4" />
+                          Simpan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleResetPassword(user.id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-400/15"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                          Reset Password
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={
+                            user._count.reports > 0 || user.id === currentUserId
+                          }
+                          onClick={() => void handleDeleteUser(user.id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}

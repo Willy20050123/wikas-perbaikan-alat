@@ -4,47 +4,57 @@ import { prisma } from "../src/lib/prisma";
 
 async function main() {
   const defaultPassword = "Admin123!";
-  const passwordHash = await bcrypt.hash(defaultPassword, 10);
+  const passwordHash = await bcrypt.hash(defaultPassword, 12);
 
   const users = [
     {
       nama: "Admin Utama",
-      email: "admin1@websitekantor.local",
+      jabatan: "Kepala Administrasi",
+      nip: "198501010000000001",
       role: "ADMIN",
     },
     {
       nama: "Admin Operasional",
-      email: "admin2@websitekantor.local",
+      jabatan: "Koordinator Operasional",
+      nip: "198501010000000002",
       role: "ADMIN",
     },
     {
       nama: "Admin Monitoring",
-      email: "admin3@websitekantor.local",
+      jabatan: "Analis Monitoring",
+      nip: "198501010000000003",
       role: "ADMIN",
     },
     {
       nama: "Admin Super",
-      email: "admin4@websitekantor.local",
+      jabatan: "Administrator Sistem",
+      nip: "198501010000000004",
       role: "ADMIN",
     },
     {
       nama: "User Biasa",
-      email: "user1@websitekantor.local",
+      jabatan: "Staff Umum",
+      nip: "198501010000000005",
       role: "USER",
     },
   ] as const;
 
   for (const user of users) {
     await prisma.user.upsert({
-      where: { email: user.email },
+      where: {
+        nip: user.nip,
+      },
       update: {
         nama: user.nama,
+        jabatan: user.jabatan,
+        nip: user.nip,
         role: user.role,
         passwordHash,
       },
       create: {
         nama: user.nama,
-        email: user.email,
+        jabatan: user.jabatan,
+        nip: user.nip,
         role: user.role,
         passwordHash,
       },
@@ -53,11 +63,11 @@ async function main() {
 
   console.log("Seed berhasil dijalankan.");
   console.log("Akun yang tersedia:");
-  console.log("- admin1@websitekantor.local / Admin123!");
-  console.log("- admin2@websitekantor.local / Admin123!");
-  console.log("- admin3@websitekantor.local / Admin123!");
-  console.log("- admin4@websitekantor.local / Admin123!");
-  console.log("- user1@websitekantor.local / Admin123!");
+  console.log("- 198501010000000001 / Admin123!");
+  console.log("- 198501010000000002 / Admin123!");
+  console.log("- 198501010000000003 / Admin123!");
+  console.log("- 198501010000000004 / Admin123!");
+  console.log("- 198501010000000005 / Admin123!");
 }
 
 main()

@@ -4,9 +4,17 @@ import StatusCard, { type StatusReportItem } from "./StatusCard";
 
 type StatusListProps = {
   reports: StatusReportItem[];
+  deletingReportId?: number | null;
+  onEdit?: (reportId: number) => void;
+  onDelete?: (reportId: number) => void;
 };
 
-export default function StatusList({ reports }: StatusListProps) {
+export default function StatusList({
+  reports,
+  deletingReportId,
+  onEdit,
+  onDelete,
+}: StatusListProps) {
   if (reports.length === 0) {
     return (
       <div className="rounded-[28px] border border-dashed border-white/10 bg-white/[0.06] p-10 text-center text-white/65">
@@ -18,7 +26,13 @@ export default function StatusList({ reports }: StatusListProps) {
   return (
     <div className="space-y-6">
       {reports.map((report) => (
-        <StatusCard key={report.id} report={report} />
+        <StatusCard
+          key={report.id}
+          report={report}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          deleting={deletingReportId === report.id}
+        />
       ))}
     </div>
   );

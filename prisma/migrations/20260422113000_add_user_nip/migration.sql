@@ -1,0 +1,4 @@
+ALTER TABLE `User`
+ADD COLUMN `nip` VARCHAR(191) NULL;
+
+CREATE UNIQUE INDEX `User_nip_key` ON `User`(`nip`);

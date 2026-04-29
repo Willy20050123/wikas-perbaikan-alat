@@ -1,37 +1,20 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { prisma } from "@/src/lib/prisma";
-import { AUTH_COOKIE_NAME, verifyAuthToken } from "@/src/lib/auth";
+import { getApiSessionUser } from "@/src/lib/session";
+import { listReportsRaw } from "@/src/lib/raw-data";
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    const authUser = await getApiSessionUser();
 
-    if (!token) {
+    if (!authUser) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const authUser = verifyAuthToken(token);
-
-    if (!authUser || authUser.role !== "ADMIN") {
+    if (authUser.role !== "ADMIN") {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
-    const reports = await prisma.report.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            nama: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const reports = await listReportsRaw();
 
     return NextResponse.json({ reports });
   } catch (error) {

@@ -19,20 +19,54 @@ export type StatusReportItem = {
   deskripsi: string;
   severity: ReportSeverity;
   fotoUrl: string | null;
+  completionPhotoUrl?: string | null;
   status: ReportStatus;
   alasanPenolakan: string | null;
+  assignedTechnician?: string | null;
+  adminNotes?: string | null;
+  completionNotes?: string | null;
   createdAt: string;
   approvedAt?: string | null;
   rejectedAt?: string | null;
+  processedAt?: string | null;
+  finishedAt?: string | null;
 };
 
 type StatusCardProps = {
   report: StatusReportItem;
+  onEdit?: (reportId: number) => void;
+  onDelete?: (reportId: number) => void;
+  deleting?: boolean;
 };
 
-export default function StatusCard({ report }: StatusCardProps) {
+function getStatusUpdateLabel(report: StatusReportItem) {
+  if (report.status === "DISETUJUI") {
+    return `Disetujui pada ${formatTanggal(report.approvedAt || null)}`;
+  }
+
+  if (report.status === "DITOLAK") {
+    return `Ditolak pada ${formatTanggal(report.rejectedAt || null)}`;
+  }
+
+  if (report.status === "DIPROSES") {
+    return `Diproses sejak ${formatTanggal(report.processedAt || null)}`;
+  }
+
+  if (report.status === "SELESAI") {
+    return `Selesai pada ${formatTanggal(report.finishedAt || null)}`;
+  }
+
+  return "Menunggu keputusan admin";
+}
+
+export default function StatusCard({
+  report,
+  onEdit,
+  onDelete,
+  deleting = false,
+}: StatusCardProps) {
   return (
-    <article className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.08] shadow-[0_20px_50px_rgba(2,6,23,0.18)] backdrop-blur-xl">
+    <article className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.08] shadow-[0_20px_50px_rgba(2,6,23,0.18)]">
       <div className="grid grid-cols-1 gap-0 lg:grid-cols-[340px_minmax(0,1fr)]">
         <div className="border-b border-white/10 bg-slate-950/30 p-4 lg:border-b-0 lg:border-r">
           {report.fotoUrl ? (
@@ -48,7 +82,7 @@ export default function StatusCard({ report }: StatusCardProps) {
             </div>
           ) : (
             <div className="flex h-[240px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-sm text-white/50">
-              Tidak ada foto
+              Tidak ada foto awal
             </div>
           )}
         </div>
@@ -95,11 +129,7 @@ export default function StatusCard({ report }: StatusCardProps) {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-sm text-white/55">Update Status</p>
               <p className="mt-1 font-semibold text-white">
-                {report.status === "DISETUJUI"
-                  ? `Disetujui pada ${formatTanggal(report.approvedAt || null)}`
-                  : report.status === "DITOLAK"
-                    ? `Ditolak pada ${formatTanggal(report.rejectedAt || null)}`
-                    : "Menunggu keputusan admin"}
+                {getStatusUpdateLabel(report)}
               </p>
             </div>
           </div>
@@ -110,6 +140,17 @@ export default function StatusCard({ report }: StatusCardProps) {
               {report.deskripsi}
             </p>
           </div>
+
+          {report.status === "DIPROSES" && report.assignedTechnician ? (
+            <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4">
+              <p className="text-sm font-semibold text-amber-50">
+                Sedang Diproses
+              </p>
+              <p className="mt-2 text-amber-50/90">
+                Penanggung jawab perbaikan: {report.assignedTechnician}
+              </p>
+            </div>
+          ) : null}
 
           {report.status === "DITOLAK" && report.alasanPenolakan ? (
             <div className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-400/10 p-4">
@@ -128,8 +169,55 @@ export default function StatusCard({ report }: StatusCardProps) {
                 Laporan Disetujui
               </p>
               <p className="mt-2 leading-7 text-emerald-50/90">
-                Laporan kamu sudah diterima admin dan masuk proses tindak lanjut.
+                Laporan kamu sudah diterima admin dan siap masuk tahap perbaikan.
               </p>
+            </div>
+          ) : null}
+
+          {report.status === "SELESAI" ? (
+            <div className="mt-5 space-y-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4">
+              <div>
+                <p className="text-sm font-semibold text-emerald-100">
+                  Pengerjaan Selesai
+                </p>
+                <p className="mt-2 leading-7 text-emerald-50/90">
+                  {report.completionNotes || "Perbaikan sudah selesai dikerjakan."}
+                </p>
+              </div>
+
+              {report.completionPhotoUrl ? (
+                <div className="overflow-hidden rounded-2xl border border-emerald-300/15">
+                  <Image
+                    src={report.completionPhotoUrl}
+                    alt={`Bukti penyelesaian ${report.namaBarang}`}
+                    width={1200}
+                    height={900}
+                    className="w-full object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {report.status === "MENUNGGU" ? (
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => onEdit?.(report.id)}
+                className="rounded-2xl border border-cyan-300/18 bg-cyan-400/12 px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/18"
+              >
+                Edit Laporan
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onDelete?.(report.id)}
+                disabled={deleting}
+                className="rounded-2xl border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleting ? "Menghapus..." : "Hapus Laporan"}
+              </button>
             </div>
           ) : null}
         </div>
