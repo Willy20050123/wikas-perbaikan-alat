@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   KeyRound,
   RefreshCcw,
   Save,
+  Search,
   Trash2,
   UserPlus,
 } from "lucide-react";
@@ -33,6 +34,8 @@ type DraftMap = Record<
   }
 >;
 
+type PasswordDraftMap = Record<number, string>;
+
 type AdminUsersPageProps = {
   currentUserId: number;
 };
@@ -43,9 +46,10 @@ export default function AdminUsersPage({
   const router = useRouter();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [drafts, setDrafts] = useState<DraftMap>({});
+  const [passwordDrafts, setPasswordDrafts] = useState<PasswordDraftMap>({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [createdPassword, setCreatedPassword] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [newUser, setNewUser] = useState({
     nama: "",
     jabatan: "",
@@ -99,7 +103,6 @@ export default function AdminUsersPage({
   async function handleCreateUser() {
     try {
       setMessage("");
-      setCreatedPassword("");
 
       const res = await fetch("/api/admin/users", {
         method: "POST",
@@ -116,7 +119,6 @@ export default function AdminUsersPage({
         return;
       }
 
-      setCreatedPassword(data.generatedPassword || "");
       setNewUser({
         nama: "",
         jabatan: "",
@@ -140,7 +142,6 @@ export default function AdminUsersPage({
 
     try {
       setMessage("");
-      setCreatedPassword("");
 
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PATCH",
@@ -163,21 +164,28 @@ export default function AdminUsersPage({
   }
 
   async function handleResetPassword(userId: number) {
+    const password = passwordDrafts[userId] || "";
+
     try {
       setMessage("");
-      setCreatedPassword("");
 
       const res = await fetch(`/api/admin/users/${userId}/password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ password }),
       });
 
       const data = await res.json();
       setMessage(data.message || "Password user berhasil direset.");
-      setCreatedPassword(data.generatedPassword || "");
+
+      if (res.ok) {
+        setPasswordDrafts((current) => ({
+          ...current,
+          [userId]: "",
+        }));
+      }
     } catch (error) {
       console.error("RESET_ADMIN_USER_PASSWORD_ERROR:", error);
       setMessage("Terjadi kesalahan saat mereset password user.");
@@ -195,7 +203,6 @@ export default function AdminUsersPage({
 
     try {
       setMessage("");
-      setCreatedPassword("");
 
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "DELETE",
@@ -218,10 +225,31 @@ export default function AdminUsersPage({
     }
   }
 
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return users;
+    }
+
+    return users.filter((user) =>
+      [
+        user.nama,
+        user.jabatan || "",
+        user.nip || "",
+        user.role,
+        String(user.id),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [searchQuery, users]);
+
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
               Admin Panel
@@ -232,7 +260,7 @@ export default function AdminUsersPage({
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 md:justify-end">
             <button
               type="button"
               onClick={() => void loadUsers()}
@@ -256,12 +284,6 @@ export default function AdminUsersPage({
         {message ? (
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm">
             {message}
-          </div>
-        ) : null}
-
-        {createdPassword ? (
-          <div className="mb-6 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-50">
-            Password sementara: <span className="font-bold">{createdPassword}</span>
           </div>
         ) : null}
 
@@ -321,11 +343,12 @@ export default function AdminUsersPage({
             </select>
 
             <input
+              type="password"
               value={newUser.password}
               onChange={(event) =>
                 setNewUser((current) => ({ ...current, password: event.target.value }))
               }
-              placeholder="Password opsional"
+              placeholder="Password"
               className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
             />
           </div>
@@ -342,16 +365,37 @@ export default function AdminUsersPage({
 
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.08] shadow-[0_24px_60px_rgba(2,6,23,0.16)]">
           <div className="border-b border-white/10 px-6 py-5">
-            <h2 className="text-2xl font-bold text-white">Daftar User</h2>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Daftar User</h2>
+                <p className="mt-1 text-sm text-white/55">
+                  {filteredUsers.length} dari {users.length} user ditampilkan.
+                </p>
+              </div>
+
+              <label className="relative block w-full lg:max-w-md">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Cari nama, NIP, jabatan, atau role"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 py-3 pl-11 pr-4 text-white outline-none placeholder:text-white/35 focus:border-cyan-300/30"
+                />
+              </label>
+            </div>
           </div>
 
           {loading ? (
             <div className="px-6 py-8 text-white/70">Memuat daftar user...</div>
           ) : users.length === 0 ? (
             <div className="px-6 py-8 text-white/70">Belum ada user.</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="px-6 py-8 text-white/70">
+              Tidak ada user yang cocok dengan pencarian.
+            </div>
           ) : (
             <div className="space-y-4 p-6">
-              {users.map((user) => {
+              {filteredUsers.map((user) => {
                 const draft = drafts[user.id] || {
                   nama: user.nama,
                   jabatan: user.jabatan || "",
@@ -467,6 +511,23 @@ export default function AdminUsersPage({
                             {user._count.reports}
                           </p>
                         </div>
+
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <label className="mb-2 block text-sm text-white/60">
+                            Password Baru
+                          </label>
+                          <input
+                            type="password"
+                            value={passwordDrafts[user.id] || ""}
+                            onChange={(event) =>
+                              setPasswordDrafts((current) => ({
+                                ...current,
+                                [user.id]: event.target.value,
+                              }))
+                            }
+                            className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                          />
+                        </div>
                       </div>
 
                       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -492,8 +553,9 @@ export default function AdminUsersPage({
 
                         <button
                           type="button"
+                          disabled={!passwordDrafts[user.id]}
                           onClick={() => void handleResetPassword(user.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-400/15"
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <KeyRound className="h-4 w-4" />
                           Reset Password

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 function parseUserId(id: string) {
   const userId = Number(id);
@@ -35,6 +36,12 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const access = await requireAdmin();
 
     if ("error" in access) {
@@ -120,10 +127,16 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const requestError = validateMutationRequest(req);
+
+    if (requestError) {
+      return requestError;
+    }
+
     const access = await requireAdmin();
 
     if ("error" in access) {

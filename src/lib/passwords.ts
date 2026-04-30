@@ -34,10 +34,6 @@ export async function verifyPassword(password: string, passwordHash: string) {
   return bcrypt.compare(password, passwordHash);
 }
 
-export function generateRandomPassword() {
-  return `${randomBytes(4).toString("hex")}!Aa9`;
-}
-
 export function createPasswordResetToken() {
   const rawToken = randomBytes(32).toString("hex");
 

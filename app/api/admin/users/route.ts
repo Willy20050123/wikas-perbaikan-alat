@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
 import {
-  generateRandomPassword,
   hashPassword,
   validatePasswordStrength,
 } from "@/src/lib/passwords";
@@ -10,6 +9,7 @@ import {
   findUserByNipRaw,
   listUsersWithReportCountRaw,
 } from "@/src/lib/raw-data";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 async function requireAdmin() {
   const authUser = await getApiSessionUser();
@@ -52,6 +52,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const access = await requireAdmin();
 
     if ("error" in access) {
@@ -64,14 +70,11 @@ export async function POST(req: Request) {
       typeof body.jabatan === "string" ? body.jabatan.trim() : "";
     const nip = typeof body.nip === "string" ? body.nip.trim() : "";
     const role = body.role === "ADMIN" ? "ADMIN" : "USER";
-    const password =
-      typeof body.password === "string" && body.password.trim()
-        ? body.password.trim()
-        : generateRandomPassword();
+    const password = typeof body.password === "string" ? body.password : "";
 
-    if (!nama || !nip) {
+    if (!nama || !nip || !password) {
       return NextResponse.json(
-        { message: "Nama dan NIP wajib diisi." },
+        { message: "Nama, NIP, dan password wajib diisi." },
         { status: 400 }
       );
     }
@@ -124,7 +127,6 @@ export async function POST(req: Request) {
     return NextResponse.json({
       message: "User berhasil dibuat.",
       user: createdUser,
-      generatedPassword: password,
     });
   } catch (error) {
     console.error("CREATE_ADMIN_USER_ERROR:", error);

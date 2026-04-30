@@ -148,25 +148,27 @@ export default function ReportForm({
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-8">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold md:text-4xl">
+              {isEditMode ? "Edit Laporan" : "Buat Laporan"}
+            </h1>
+            <p className="mt-2 text-white/70">
+              {isEditMode
+                ? "Perbarui detail laporan selagi statusnya masih menunggu."
+                : "Pilih kategori, isi detail kerusakan, lalu upload foto barang atau alat."}
+            </p>
+          </div>
+
           {headerBackHref ? (
             <Link
               href={headerBackHref}
-              className="mb-4 inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/15"
             >
               <ArrowLeft className="h-4 w-4" />
               {headerBackLabel}
             </Link>
           ) : null}
-
-          <h1 className="text-3xl font-bold md:text-4xl">
-            {isEditMode ? "Edit Laporan" : "Buat Laporan"}
-          </h1>
-          <p className="mt-2 text-white/70">
-            {isEditMode
-              ? "Perbarui detail laporan selagi statusnya masih menunggu."
-              : "Pilih kategori, isi detail kerusakan, lalu upload foto barang atau alat."}
-          </p>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">

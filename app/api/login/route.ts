@@ -8,9 +8,21 @@ import {
 import { verifyPassword } from "@/src/lib/passwords";
 import { getDefaultRedirectForRole } from "@/src/lib/session";
 import { findUserByNipRaw } from "@/src/lib/raw-data";
+import {
+  clearRateLimit,
+  getClientIp,
+  isRateLimited,
+} from "@/src/lib/rate-limit";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 export async function POST(req: Request) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const body = await req.json();
 
     const nip = typeof body.nip === "string" ? body.nip.trim() : "";
@@ -21,6 +33,20 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { message: "NIP dan password wajib diisi." },
         { status: 400 }
+      );
+    }
+
+    const clientIp = getClientIp(req);
+    const ipLimitKey = `login:ip:${clientIp}`;
+    const nipLimitKey = `login:nip:${nip.toLowerCase()}`;
+
+    if (
+      isRateLimited(ipLimitKey, { limit: 30, windowMs: 15 * 60 * 1000 }) ||
+      isRateLimited(nipLimitKey, { limit: 8, windowMs: 15 * 60 * 1000 })
+    ) {
+      return NextResponse.json(
+        { message: "Terlalu banyak percobaan login. Coba lagi nanti." },
+        { status: 429 }
       );
     }
 
@@ -41,6 +67,8 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
+
+    clearRateLimit(nipLimitKey);
 
     const token = signAuthToken({
       userId: user.id,

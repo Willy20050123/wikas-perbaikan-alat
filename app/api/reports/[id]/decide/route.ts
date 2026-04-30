@@ -7,6 +7,11 @@ import {
   validateImageUpload,
 } from "@/src/lib/uploads";
 import { findReportByIdRaw } from "@/src/lib/raw-data";
+import {
+  enforceJsonBodySize,
+  enforceMultipartBodySize,
+  requireSameOrigin,
+} from "@/src/lib/request-security";
 
 type WorkflowAction =
   | "APPROVE"
@@ -85,6 +90,21 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const originError = requireSameOrigin(req);
+
+    if (originError) {
+      return originError;
+    }
+
+    const contentType = req.headers.get("content-type") || "";
+    const sizeError = contentType.includes("application/json")
+      ? enforceJsonBodySize(req)
+      : enforceMultipartBodySize(req);
+
+    if (sizeError) {
+      return sizeError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {

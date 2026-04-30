@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
 import {
-  generateRandomPassword,
   hashPassword,
   validatePasswordStrength,
 } from "@/src/lib/passwords";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 function parseUserId(id: string) {
   const userId = Number(id);
@@ -22,6 +22,12 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {
@@ -43,10 +49,14 @@ export async function POST(
     }
 
     const body = await req.json();
-    const password =
-      typeof body.password === "string" && body.password.trim()
-        ? body.password.trim()
-        : generateRandomPassword();
+    const password = typeof body.password === "string" ? body.password : "";
+
+    if (!password) {
+      return NextResponse.json(
+        { message: "Password baru wajib diisi." },
+        { status: 400 }
+      );
+    }
 
     const passwordErrors = validatePasswordStrength(password);
 
@@ -72,7 +82,6 @@ export async function POST(
     return NextResponse.json({
       message: "Password user berhasil direset.",
       user: updatedUser,
-      generatedPassword: password,
     });
   } catch (error) {
     console.error("RESET_ADMIN_USER_PASSWORD_ERROR:", error);

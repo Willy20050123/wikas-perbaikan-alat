@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 export async function GET() {
   try {
@@ -31,6 +32,12 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {

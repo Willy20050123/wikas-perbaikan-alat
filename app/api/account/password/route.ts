@@ -12,9 +12,16 @@ import {
   validatePasswordStrength,
   verifyPassword,
 } from "@/src/lib/passwords";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 export async function POST(req: Request) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {

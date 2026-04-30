@@ -1,10 +1,22 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
+import { validatePasswordStrength } from "../src/lib/passwords";
 
 async function main() {
-  const defaultPassword = "Admin123!";
-  const passwordHash = await bcrypt.hash(defaultPassword, 12);
+  const seedPassword = process.env.SEED_PASSWORD;
+
+  if (!seedPassword) {
+    throw new Error("Isi SEED_PASSWORD untuk menjalankan seed akun.");
+  }
+
+  const passwordErrors = validatePasswordStrength(seedPassword);
+
+  if (passwordErrors.length > 0) {
+    throw new Error(passwordErrors[0]);
+  }
+
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
 
   const users = [
     {
@@ -62,12 +74,7 @@ async function main() {
   }
 
   console.log("Seed berhasil dijalankan.");
-  console.log("Akun yang tersedia:");
-  console.log("- 198501010000000001 / Admin123!");
-  console.log("- 198501010000000002 / Admin123!");
-  console.log("- 198501010000000003 / Admin123!");
-  console.log("- 198501010000000004 / Admin123!");
-  console.log("- 198501010000000005 / Admin123!");
+  console.log("Akun seed dibuat dengan password dari SEED_PASSWORD.");
 }
 
 main()

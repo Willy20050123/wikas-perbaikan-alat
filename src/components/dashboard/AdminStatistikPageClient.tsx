@@ -158,7 +158,7 @@ export default function AdminStatistikPageClient({
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
       <div className="mx-auto max-w-[1500px]">
-        <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100">
               <BarChart3 className="h-4 w-4" />

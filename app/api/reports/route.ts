@@ -9,9 +9,16 @@ import {
 } from "@/src/lib/report-validation";
 import { saveImageUpload, validateImageUpload } from "@/src/lib/uploads";
 import { listReportsRaw } from "@/src/lib/raw-data";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 export async function POST(req: Request) {
   try {
+    const requestError = validateMutationRequest(req, { body: "multipart" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {

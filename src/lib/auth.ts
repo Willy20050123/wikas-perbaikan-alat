@@ -23,6 +23,8 @@ export type AuthTokenPayload = {
   sessionTag: string;
 };
 
+const revokedTokenHashes = new Map<string, number>();
+
 function isAuthTokenPayload(value: string | JwtPayload): value is AuthTokenPayload {
   if (typeof value === "string") return false;
 
@@ -32,6 +34,20 @@ function isAuthTokenPayload(value: string | JwtPayload): value is AuthTokenPaylo
     (value.role === "ADMIN" || value.role === "USER") &&
     typeof value.sessionTag === "string"
   );
+}
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function pruneRevokedTokens() {
+  const now = Date.now();
+
+  for (const [tokenHash, expiresAt] of revokedTokenHashes) {
+    if (expiresAt <= now) {
+      revokedTokenHashes.delete(tokenHash);
+    }
+  }
 }
 
 export function createAuthSessionTag(input: {
@@ -51,6 +67,12 @@ export function signAuthToken(payload: AuthTokenPayload) {
 
 export function verifyAuthToken(token: string): AuthTokenPayload | null {
   try {
+    pruneRevokedTokens();
+
+    if (revokedTokenHashes.has(hashToken(token))) {
+      return null;
+    }
+
     const decoded = jwt.verify(token, AUTH_SECRET);
 
     if (!isAuthTokenPayload(decoded)) {
@@ -60,6 +82,21 @@ export function verifyAuthToken(token: string): AuthTokenPayload | null {
     return decoded;
   } catch {
     return null;
+  }
+}
+
+export function revokeAuthToken(token: string) {
+  try {
+    const decoded = jwt.decode(token) as JwtPayload | string | null;
+    const expiresAt =
+      decoded && typeof decoded !== "string" && typeof decoded.exp === "number"
+        ? decoded.exp * 1000
+        : Date.now() + AUTH_COOKIE_MAX_AGE_SECONDS * 1000;
+
+    revokedTokenHashes.set(hashToken(token), expiresAt);
+    pruneRevokedTokens();
+  } catch {
+    // A malformed token still gets cleared from the browser cookie by logout.
   }
 }
 

@@ -92,7 +92,7 @@ export default function UserStatusPage() {
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
               Dashboard Pegawai
@@ -104,7 +104,7 @@ export default function UserStatusPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 md:justify-end">
             <button
               type="button"
               onClick={() => router.push("/dashboard/user")}

@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
-export async function POST() {
+import { validateMutationRequest } from "@/src/lib/request-security";
+
+export async function POST(req: Request) {
   try {
+    const requestError = validateMutationRequest(req, { body: "json" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     return NextResponse.json({
       message: "Fitur reset password mandiri tidak tersedia. Hubungi admin.",
     }, { status: 410 });

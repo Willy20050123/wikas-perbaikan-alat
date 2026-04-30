@@ -12,6 +12,7 @@ import {
   saveImageUpload,
   validateImageUpload,
 } from "@/src/lib/uploads";
+import { validateMutationRequest } from "@/src/lib/request-security";
 
 function parseReportId(id: string) {
   const reportId = Number(id);
@@ -85,6 +86,12 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const requestError = validateMutationRequest(req, { body: "multipart" });
+
+    if (requestError) {
+      return requestError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {
@@ -201,10 +208,16 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
+    const requestError = validateMutationRequest(req);
+
+    if (requestError) {
+      return requestError;
+    }
+
     const authUser = await getApiSessionUser();
 
     if (!authUser) {
