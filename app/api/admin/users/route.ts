@@ -110,6 +110,7 @@ export async function POST(req: Request) {
         nama,
         jabatan: jabatan || null,
         nip,
+        activeNip: nip,
         passwordHash,
         role,
       },

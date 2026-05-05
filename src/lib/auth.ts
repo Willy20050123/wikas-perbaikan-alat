@@ -11,6 +11,10 @@ function getAuthSecret(): string {
     throw new Error("AUTH_SECRET belum diisi di file .env");
   }
 
+  if (process.env.NODE_ENV === "production" && secret.length < 32) {
+    throw new Error("AUTH_SECRET production minimal 32 karakter.");
+  }
+
   return secret;
 }
 

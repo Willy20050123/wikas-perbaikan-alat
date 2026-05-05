@@ -8,7 +8,9 @@ export type SessionUserRow = {
   nama: string;
   jabatan: string | null;
   nip: string | null;
+  activeNip: string | null;
   role: "ADMIN" | "USER";
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -111,29 +113,33 @@ export function findUserByIdRaw(
 ): Promise<SessionUserRow | null>;
 export async function findUserByIdRaw(id: number, includePassword = false) {
   if (includePassword) {
-    return prisma.user.findUnique({
-      where: { id },
+    return prisma.user.findFirst({
+      where: { id, deletedAt: null },
       select: {
         id: true,
         nama: true,
         jabatan: true,
         nip: true,
+        activeNip: true,
         role: true,
         passwordHash: true,
+        deletedAt: true,
         createdAt: true,
         updatedAt: true,
       },
     });
   }
 
-  return prisma.user.findUnique({
-    where: { id },
+  return prisma.user.findFirst({
+    where: { id, deletedAt: null },
     select: {
       id: true,
       nama: true,
       jabatan: true,
       nip: true,
+      activeNip: true,
       role: true,
+      deletedAt: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -151,14 +157,16 @@ export function findUserByNipRaw(
 export async function findUserByNipRaw(nip: string, includePassword = false) {
   if (includePassword) {
     return prisma.user.findUnique({
-      where: { nip },
+      where: { activeNip: nip },
       select: {
         id: true,
         nama: true,
         jabatan: true,
         nip: true,
+        activeNip: true,
         role: true,
         passwordHash: true,
+        deletedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -166,13 +174,15 @@ export async function findUserByNipRaw(nip: string, includePassword = false) {
   }
 
   return prisma.user.findUnique({
-    where: { nip },
+    where: { activeNip: nip },
     select: {
       id: true,
       nama: true,
       jabatan: true,
       nip: true,
+      activeNip: true,
       role: true,
+      deletedAt: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -180,22 +190,52 @@ export async function findUserByNipRaw(nip: string, includePassword = false) {
 }
 
 export async function listUsersWithReportCountRaw() {
-  return prisma.user.findMany({
-    select: {
-      id: true,
-      nama: true,
-      jabatan: true,
-      nip: true,
-      role: true,
-      createdAt: true,
-      _count: {
-        select: {
-          reports: true,
+  const [users, activeReportCounts] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        nama: true,
+        jabatan: true,
+        nip: true,
+        activeNip: true,
+        role: true,
+        deletedAt: true,
+        createdAt: true,
+        _count: {
+          select: {
+            reports: true,
+          },
         },
       },
+      orderBy: [{ role: "asc" }, { nama: "asc" }],
+    }),
+    prisma.report.groupBy({
+      by: ["userId"],
+      where: {
+        status: {
+          in: ["MENUNGGU", "DISETUJUI", "DIPROSES"],
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    }),
+  ]);
+
+  const activeCountByUserId = new Map(
+    activeReportCounts.map((item) => [item.userId, item._count._all])
+  );
+
+  return users.map((user) => ({
+    ...user,
+    _count: {
+      ...user._count,
+      activeReports: activeCountByUserId.get(user.id) || 0,
     },
-    orderBy: [{ role: "asc" }, { nama: "asc" }],
-  });
+  }));
 }
 
 export async function listReportsRaw(userId?: number) {

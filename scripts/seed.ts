@@ -54,12 +54,14 @@ async function main() {
   for (const user of users) {
     await prisma.user.upsert({
       where: {
-        nip: user.nip,
+        activeNip: user.nip,
       },
       update: {
         nama: user.nama,
         jabatan: user.jabatan,
         nip: user.nip,
+        activeNip: user.nip,
+        deletedAt: null,
         role: user.role,
         passwordHash,
       },
@@ -67,6 +69,7 @@ async function main() {
         nama: user.nama,
         jabatan: user.jabatan,
         nip: user.nip,
+        activeNip: user.nip,
         role: user.role,
         passwordHash,
       },

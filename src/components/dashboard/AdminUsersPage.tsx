@@ -21,6 +21,7 @@ type UserItem = {
   createdAt: string;
   _count: {
     reports: number;
+    activeReports: number;
   };
 };
 
@@ -193,8 +194,11 @@ export default function AdminUsersPage({
   }
 
   async function handleDeleteUser(userId: number) {
+    const user = users.find((item) => item.id === userId);
     const confirmed = window.confirm(
-      "Hapus user ini? Tindakan ini tidak bisa dibatalkan."
+      user && user._count.reports > 0
+        ? "Hapus user ini? Akun akan dinonaktifkan, tetapi riwayat laporan tetap tersimpan."
+        : "Hapus user ini? Akun akan dinonaktifkan."
     );
 
     if (!confirmed) {
@@ -402,6 +406,17 @@ export default function AdminUsersPage({
                   nip: user.nip || "",
                   role: user.role,
                 };
+                const activeReportCount = user._count.activeReports || 0;
+                const canDeleteUser =
+                  activeReportCount === 0 && user.id !== currentUserId;
+                const deletionStatus =
+                  user.id === currentUserId
+                    ? "Akun admin aktif tidak bisa dihapus."
+                      : activeReportCount > 0
+                        ? "Tidak bisa dihapus karena masih memiliki laporan aktif."
+                      : user._count.reports > 0
+                        ? "Bisa dihapus. Riwayat laporan tertutup tetap tersimpan."
+                        : "Aman untuk dihapus bila memang tidak digunakan.";
 
                 return (
                   <div
@@ -510,6 +525,9 @@ export default function AdminUsersPage({
                           <p className="mt-2 text-2xl font-bold text-white">
                             {user._count.reports}
                           </p>
+                          <p className="mt-1 text-xs text-white/50">
+                            Aktif: {activeReportCount}
+                          </p>
                         </div>
 
                         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -533,11 +551,7 @@ export default function AdminUsersPage({
                       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                         <p className="text-sm text-white/55">Status Penghapusan</p>
                         <p className="mt-2 text-sm text-white/75">
-                          {user._count.reports > 0
-                            ? "Tidak dapat dihapus karena sudah memiliki laporan."
-                            : user.id === currentUserId
-                              ? "Akun admin aktif tidak bisa dihapus."
-                              : "Aman untuk dihapus bila memang tidak digunakan."}
+                          {deletionStatus}
                         </p>
                       </div>
 
@@ -563,9 +577,7 @@ export default function AdminUsersPage({
 
                         <button
                           type="button"
-                          disabled={
-                            user._count.reports > 0 || user.id === currentUserId
-                          }
+                          disabled={!canDeleteUser}
                           onClick={() => void handleDeleteUser(user.id)}
                           className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-50"
                         >

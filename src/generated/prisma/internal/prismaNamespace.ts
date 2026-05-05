@@ -648,8 +648,10 @@ export const UserScalarFieldEnum = {
   nama: 'nama',
   jabatan: 'jabatan',
   nip: 'nip',
+  activeNip: 'activeNip',
   passwordHash: 'passwordHash',
   role: 'role',
+  deletedAt: 'deletedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -715,6 +717,7 @@ export const UserOrderByRelevanceFieldEnum = {
   nama: 'nama',
   jabatan: 'jabatan',
   nip: 'nip',
+  activeNip: 'activeNip',
   passwordHash: 'passwordHash'
 } as const
 

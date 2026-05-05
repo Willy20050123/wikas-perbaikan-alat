@@ -36,9 +36,11 @@ model User {
   id           Int      @id @default(autoincrement())
   nama         String
   jabatan      String?
-  nip          String?  @unique
+  nip          String?
+  activeNip    String?  @unique
   passwordHash String
   role         Role     @default(USER)
+  deletedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -68,7 +70,7 @@ model Report {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
-  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User           @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([userId, createdAt])

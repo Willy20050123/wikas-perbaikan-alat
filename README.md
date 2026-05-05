@@ -16,9 +16,18 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production Checklist
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Before deploying, configure the production environment from `.env.example`:
+
+- Set `DATABASE_URL` to the production MariaDB database.
+- Set `AUTH_SECRET` to a unique random value with at least 32 characters.
+- Set `APP_ORIGIN` to the deployed HTTPS origin.
+- Run Prisma migrations against the production database.
+- Ensure `public/uploads` is backed by persistent storage if the app is deployed on more than one instance or on ephemeral/serverless infrastructure.
+- Run `npm run lint`, `npx tsc --noEmit`, and `npm run build` before release.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Learn More
 

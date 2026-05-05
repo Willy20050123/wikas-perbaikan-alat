@@ -7,7 +7,7 @@ async function main() {
   const newPassword = "PasswordBaru123!";
 
   const user = await prisma.user.findUnique({
-    where: { nip },
+    where: { activeNip: nip },
   });
 
   if (!user) {
@@ -18,7 +18,7 @@ async function main() {
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await prisma.user.update({
-    where: { nip },
+    where: { id: user.id },
     data: {
       passwordHash,
     },

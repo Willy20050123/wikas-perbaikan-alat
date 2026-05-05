@@ -755,10 +755,6 @@ export type EnumReportStatusFieldUpdateOperationsInput = {
   set?: $Enums.ReportStatus
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type ReportCreateWithoutUserInput = {
   kategori: $Enums.ReportCategory
   namaBarang: string

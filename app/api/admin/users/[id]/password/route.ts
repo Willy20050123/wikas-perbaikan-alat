@@ -48,6 +48,28 @@ export async function POST(
       );
     }
 
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json(
+        { message: "User tidak ditemukan." },
+        { status: 404 }
+      );
+    }
+
+    if (targetUser.deletedAt) {
+      return NextResponse.json(
+        { message: "User sudah dihapus dan tidak bisa direset password." },
+        { status: 400 }
+      );
+    }
+
     const body = await req.json();
     const password = typeof body.password === "string" ? body.password : "";
 
