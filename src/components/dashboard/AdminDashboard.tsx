@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   BarChart3,
   CalendarDays,
@@ -69,6 +70,34 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function getWorkflowValidationMessage(
+  action: "APPROVE" | "REJECT" | "START_PROCESS" | "COMPLETE",
+  input: {
+    alasanPenolakan: string;
+    assignedTechnician: string;
+    completionNotes: string;
+    completionPhoto: File | null;
+  },
+) {
+  if (action === "REJECT" && !input.alasanPenolakan.trim()) {
+    return "Alasan penolakan wajib diisi sebelum laporan ditolak.";
+  }
+
+  if (action === "START_PROCESS" && !input.assignedTechnician.trim()) {
+    return "Nama penanggung jawab wajib diisi sebelum memulai proses.";
+  }
+
+  if (
+    action === "COMPLETE" &&
+    !input.completionNotes.trim() &&
+    !input.completionPhoto
+  ) {
+    return "Isi catatan penyelesaian atau upload foto bukti terlebih dahulu.";
+  }
+
+  return null;
 }
 
 export default function AdminDashboard({
@@ -149,6 +178,21 @@ export default function AdminDashboard({
       return;
     }
 
+    const validationMessage = getWorkflowValidationMessage(action, {
+      alasanPenolakan,
+      assignedTechnician,
+      completionNotes,
+      completionPhoto,
+    });
+
+    if (validationMessage) {
+      toast.warning("Data belum lengkap", {
+        description: validationMessage,
+      });
+      setMessage(validationMessage);
+      return;
+    }
+
     try {
       setSubmitLoading(true);
 
@@ -170,16 +214,34 @@ export default function AdminDashboard({
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Gagal memperbarui workflow laporan.");
+        const errorMessage =
+          data.message || "Gagal memperbarui workflow laporan.";
+
+        setMessage(errorMessage);
+        toast.error("Gagal memperbarui laporan", {
+          description: errorMessage,
+        });
         return;
       }
 
-      setMessage(data.message || "Workflow laporan berhasil diperbarui.");
+      const successMessage =
+        data.message || "Workflow laporan berhasil diperbarui.";
+
+      setMessage(successMessage);
+      toast.success("Laporan diperbarui", {
+        description: successMessage,
+      });
       closeReportDetail();
       await loadReports();
     } catch (error) {
       console.error("SUBMIT_WORKFLOW_ERROR:", error);
-      setMessage("Terjadi kesalahan saat memperbarui workflow laporan.");
+      const errorMessage =
+        "Terjadi kesalahan saat memperbarui workflow laporan.";
+
+      setMessage(errorMessage);
+      toast.error("Gagal memperbarui laporan", {
+        description: errorMessage,
+      });
     } finally {
       setSubmitLoading(false);
     }
