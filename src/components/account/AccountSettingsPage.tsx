@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ArrowLeft, KeyRound, Save, ShieldCheck, UserRound } from "lucide-react";
 
 type AccountUser = {
@@ -15,6 +16,22 @@ type AccountUser = {
 type AccountSettingsPageProps = {
   currentUser: AccountUser;
 };
+
+async function readApiResponse(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+
+  const text = await res.text();
+
+  return {
+    message:
+      text.trim().slice(0, 180) ||
+      `Request gagal dengan status ${res.status}.`,
+  };
+}
 
 export default function AccountSettingsPage({
   currentUser,
@@ -87,17 +104,32 @@ export default function AccountSettingsPage({
         }),
       });
 
-      const data = await res.json();
-      setPasswordMessage(data.message || "Password berhasil diperbarui.");
+      const data = await readApiResponse(res);
+      const responseMessage = data.message || "Password berhasil diperbarui.";
 
-      if (res.ok) {
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
+      setPasswordMessage(responseMessage);
+
+      if (!res.ok) {
+        toast.error("Password gagal diperbarui", {
+          description: responseMessage,
+        });
+        return;
       }
+
+      toast.success("Password berhasil diperbarui", {
+        description: responseMessage,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (error) {
       console.error(error);
-      setPasswordMessage("Terjadi kesalahan saat memperbarui password.");
+      const errorMessage = "Terjadi kesalahan saat memperbarui password.";
+
+      setPasswordMessage(errorMessage);
+      toast.error("Password gagal diperbarui", {
+        description: errorMessage,
+      });
     } finally {
       setPasswordLoading(false);
     }

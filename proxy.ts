@@ -19,10 +19,6 @@ export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const auth = getAuthPayload(request);
   const isDashboardRoute = pathname.startsWith("/dashboard");
-  const isAuthRoute =
-    pathname === "/login" ||
-    pathname === "/forgot-password" ||
-    pathname.startsWith("/reset-password/");
 
   if (!auth) {
     if (isDashboardRoute) {
@@ -35,10 +31,6 @@ export function proxy(request: NextRequest) {
   const defaultDashboard = getDefaultDashboard(auth.role);
 
   if (pathname === "/dashboard") {
-    return NextResponse.redirect(new URL(defaultDashboard, request.url));
-  }
-
-  if (isAuthRoute) {
     return NextResponse.redirect(new URL(defaultDashboard, request.url));
   }
 

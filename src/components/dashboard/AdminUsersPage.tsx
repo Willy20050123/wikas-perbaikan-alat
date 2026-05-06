@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   KeyRound,
@@ -41,6 +42,22 @@ type AdminUsersPageProps = {
   currentUserId: number;
 };
 
+async function readApiResponse(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+
+  const text = await res.text();
+
+  return {
+    message:
+      text.trim().slice(0, 180) ||
+      `Request gagal dengan status ${res.status}.`,
+  };
+}
+
 export default function AdminUsersPage({
   currentUserId,
 }: AdminUsersPageProps) {
@@ -67,10 +84,15 @@ export default function AdminUsersPage({
       const res = await fetch("/api/admin/users", {
         cache: "no-store",
       });
-      const data = await res.json();
+      const data = await readApiResponse(res);
 
       if (!res.ok) {
-        setMessage(data.message || "Gagal memuat daftar user.");
+        const errorMessage = data.message || "Gagal memuat daftar user.";
+
+        setMessage(errorMessage);
+        toast.error("Gagal memuat user", {
+          description: errorMessage,
+        });
         return;
       }
 
@@ -91,7 +113,12 @@ export default function AdminUsersPage({
       );
     } catch (error) {
       console.error("LOAD_ADMIN_USERS_ERROR:", error);
-      setMessage("Terjadi kesalahan saat memuat daftar user.");
+      const errorMessage = "Terjadi kesalahan saat memuat daftar user.";
+
+      setMessage(errorMessage);
+      toast.error("Gagal memuat user", {
+        description: errorMessage,
+      });
     } finally {
       setLoading(false);
     }
@@ -113,13 +140,21 @@ export default function AdminUsersPage({
         body: JSON.stringify(newUser),
       });
 
-      const data = await res.json();
-      setMessage(data.message || "User berhasil dibuat.");
+      const data = await readApiResponse(res);
+      const responseMessage = data.message || "User berhasil dibuat.";
+
+      setMessage(responseMessage);
 
       if (!res.ok) {
+        toast.error("Gagal membuat user", {
+          description: responseMessage,
+        });
         return;
       }
 
+      toast.success("User dibuat", {
+        description: responseMessage,
+      });
       setNewUser({
         nama: "",
         jabatan: "",
@@ -130,7 +165,12 @@ export default function AdminUsersPage({
       await loadUsers();
     } catch (error) {
       console.error("CREATE_ADMIN_USER_ERROR:", error);
-      setMessage("Terjadi kesalahan saat membuat user.");
+      const errorMessage = "Terjadi kesalahan saat membuat user.";
+
+      setMessage(errorMessage);
+      toast.error("Gagal membuat user", {
+        description: errorMessage,
+      });
     }
   }
 
@@ -152,15 +192,30 @@ export default function AdminUsersPage({
         body: JSON.stringify(draft),
       });
 
-      const data = await res.json();
-      setMessage(data.message || "User berhasil diperbarui.");
+      const data = await readApiResponse(res);
+      const responseMessage = data.message || "User berhasil diperbarui.";
 
-      if (res.ok) {
-        await loadUsers();
+      setMessage(responseMessage);
+
+      if (!res.ok) {
+        toast.error("Gagal memperbarui user", {
+          description: responseMessage,
+        });
+        return;
       }
+
+      toast.success("User diperbarui", {
+        description: responseMessage,
+      });
+      await loadUsers();
     } catch (error) {
       console.error("UPDATE_ADMIN_USER_ERROR:", error);
-      setMessage("Terjadi kesalahan saat memperbarui user.");
+      const errorMessage = "Terjadi kesalahan saat memperbarui user.";
+
+      setMessage(errorMessage);
+      toast.error("Gagal memperbarui user", {
+        description: errorMessage,
+      });
     }
   }
 
@@ -178,18 +233,33 @@ export default function AdminUsersPage({
         body: JSON.stringify({ password }),
       });
 
-      const data = await res.json();
-      setMessage(data.message || "Password user berhasil direset.");
+      const data = await readApiResponse(res);
+      const responseMessage = data.message || "Password user berhasil direset.";
 
-      if (res.ok) {
-        setPasswordDrafts((current) => ({
-          ...current,
-          [userId]: "",
-        }));
+      setMessage(responseMessage);
+
+      if (!res.ok) {
+        toast.error("Reset password gagal", {
+          description: responseMessage,
+        });
+        return;
       }
+
+      toast.success("Password direset", {
+        description: responseMessage,
+      });
+      setPasswordDrafts((current) => ({
+        ...current,
+        [userId]: "",
+      }));
     } catch (error) {
       console.error("RESET_ADMIN_USER_PASSWORD_ERROR:", error);
-      setMessage("Terjadi kesalahan saat mereset password user.");
+      const errorMessage = "Terjadi kesalahan saat mereset password user.";
+
+      setMessage(errorMessage);
+      toast.error("Reset password gagal", {
+        description: errorMessage,
+      });
     }
   }
 
@@ -212,20 +282,35 @@ export default function AdminUsersPage({
         method: "DELETE",
       });
 
-      const data = await res.json();
-      setMessage(data.message || "User berhasil dihapus.");
+      const data = await readApiResponse(res);
+      const responseMessage = data.message || "User berhasil dihapus.";
 
-      if (res.ok) {
-        setUsers((current) => current.filter((user) => user.id !== userId));
-        setDrafts((current) => {
-          const next = { ...current };
-          delete next[userId];
-          return next;
+      setMessage(responseMessage);
+
+      if (!res.ok) {
+        toast.error("Gagal menghapus user", {
+          description: responseMessage,
         });
+        return;
       }
+
+      toast.success("User dihapus", {
+        description: responseMessage,
+      });
+      setUsers((current) => current.filter((user) => user.id !== userId));
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      });
     } catch (error) {
       console.error("DELETE_ADMIN_USER_ERROR:", error);
-      setMessage("Terjadi kesalahan saat menghapus user.");
+      const errorMessage = "Terjadi kesalahan saat menghapus user.";
+
+      setMessage(errorMessage);
+      toast.error("Gagal menghapus user", {
+        description: errorMessage,
+      });
     }
   }
 
