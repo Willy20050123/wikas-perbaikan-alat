@@ -1,10 +1,23 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
+import { validatePasswordStrength } from "../src/lib/passwords";
 
 async function main() {
-  const nip = "198501010000000001";
-  const newPassword = "PasswordBaru123!";
+  const nip = process.env.CHANGE_PASSWORD_NIP || process.argv[2] || "";
+  const newPassword = process.env.CHANGE_PASSWORD_NEW || process.argv[3] || "";
+
+  if (!nip || !newPassword) {
+    throw new Error(
+      "Gunakan: npm run change-password -- <nip> <password-baru> atau isi CHANGE_PASSWORD_NIP dan CHANGE_PASSWORD_NEW."
+    );
+  }
+
+  const passwordErrors = validatePasswordStrength(newPassword);
+
+  if (passwordErrors.length > 0) {
+    throw new Error(passwordErrors[0]);
+  }
 
   const user = await prisma.user.findUnique({
     where: { activeNip: nip },
@@ -26,7 +39,6 @@ async function main() {
 
   console.log("Password berhasil diubah");
   console.log("NIP:", nip);
-  console.log("Password baru:", newPassword);
 }
 
 main()

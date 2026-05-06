@@ -40,10 +40,12 @@ export async function POST(req: Request) {
     const ipLimitKey = `login:ip:${clientIp}`;
     const nipLimitKey = `login:nip:${nip.toLowerCase()}`;
 
-    if (
-      isRateLimited(ipLimitKey, { limit: 30, windowMs: 15 * 60 * 1000 }) ||
-      isRateLimited(nipLimitKey, { limit: 8, windowMs: 15 * 60 * 1000 })
-    ) {
+    const [ipLimited, nipLimited] = await Promise.all([
+      isRateLimited(ipLimitKey, { limit: 30, windowMs: 15 * 60 * 1000 }),
+      isRateLimited(nipLimitKey, { limit: 8, windowMs: 15 * 60 * 1000 }),
+    ]);
+
+    if (ipLimited || nipLimited) {
       return NextResponse.json(
         { message: "Terlalu banyak percobaan login. Coba lagi nanti." },
         { status: 429 }
@@ -68,7 +70,10 @@ export async function POST(req: Request) {
       );
     }
 
-    clearRateLimit(nipLimitKey);
+    await Promise.all([
+      clearRateLimit(nipLimitKey),
+      clearRateLimit(ipLimitKey),
+    ]);
 
     const token = signAuthToken({
       userId: user.id,

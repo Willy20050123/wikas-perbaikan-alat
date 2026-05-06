@@ -64,6 +64,7 @@ export async function PATCH(
       where: { id: userId },
       select: {
         id: true,
+        role: true,
         deletedAt: true,
       },
     });
@@ -88,6 +89,13 @@ export async function PATCH(
       typeof body.jabatan === "string" ? body.jabatan.trim() : "";
     const nip = typeof body.nip === "string" ? body.nip.trim() : "";
     const role = body.role === "ADMIN" ? "ADMIN" : "USER";
+
+    if (access.authUser.id === userId && role !== targetUser.role) {
+      return NextResponse.json(
+        { message: "Admin aktif tidak bisa mengubah role akunnya sendiri." },
+        { status: 400 }
+      );
+    }
 
     if (!nama || !nip) {
       return NextResponse.json(
@@ -115,6 +123,22 @@ export async function PATCH(
         { message: "NIP sudah digunakan." },
         { status: 400 }
       );
+    }
+
+    if (targetUser.role === "ADMIN" && role === "USER") {
+      const activeAdminCount = await prisma.user.count({
+        where: {
+          role: "ADMIN",
+          deletedAt: null,
+        },
+      });
+
+      if (activeAdminCount <= 1) {
+        return NextResponse.json(
+          { message: "Minimal harus ada satu admin aktif." },
+          { status: 400 }
+        );
+      }
     }
 
     const updatedUser = await prisma.user.update({

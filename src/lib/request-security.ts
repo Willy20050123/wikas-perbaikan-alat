@@ -45,7 +45,10 @@ export function enforceBodySize(req: Request, maxBytes: number) {
   const contentLength = req.headers.get("content-length");
 
   if (!contentLength) {
-    return null;
+    return NextResponse.json(
+      { message: "Header Content-Length wajib dikirim." },
+      { status: 411 }
+    );
   }
 
   const parsed = Number(contentLength);

@@ -1,11 +1,6 @@
 import "server-only";
 
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-
-const buckets = new Map<string, RateLimitEntry>();
+import { prisma } from "@/src/lib/prisma";
 
 export function getClientIp(req: Request) {
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -24,22 +19,70 @@ export function getClientIp(req: Request) {
 export function isRateLimited(
   key: string,
   options: { limit: number; windowMs: number }
+): Promise<boolean> {
+  return checkRateLimit(key, options);
+}
+
+async function pruneExpiredBuckets(now: Date) {
+  await prisma.rateLimitBucket.deleteMany({
+    where: {
+      resetAt: {
+        lte: now,
+      },
+    },
+  });
+}
+
+async function checkRateLimit(
+  key: string,
+  options: { limit: number; windowMs: number }
 ) {
-  const now = Date.now();
-  const current = buckets.get(key);
+  const now = new Date();
+  const resetAt = new Date(now.getTime() + options.windowMs);
+
+  if (Math.random() < 0.02) {
+    await pruneExpiredBuckets(now);
+  }
+
+  const current = await prisma.rateLimitBucket.findUnique({
+    where: { key },
+  });
 
   if (!current || current.resetAt <= now) {
-    buckets.set(key, {
-      count: 1,
-      resetAt: now + options.windowMs,
+    await prisma.rateLimitBucket.upsert({
+      where: { key },
+      update: {
+        count: 1,
+        resetAt,
+      },
+      create: {
+        key,
+        count: 1,
+        resetAt,
+      },
     });
+
     return false;
   }
 
-  current.count += 1;
-  return current.count > options.limit;
+  const updated = await prisma.rateLimitBucket.update({
+    where: { key },
+    data: {
+      count: {
+        increment: 1,
+      },
+    },
+  });
+
+  return updated.count > options.limit;
 }
 
-export function clearRateLimit(key: string) {
-  buckets.delete(key);
+export async function clearRateLimit(key: string) {
+  await prisma.rateLimitBucket.delete({
+    where: { key },
+  }).catch((error: { code?: string }) => {
+    if (error.code !== "P2025") {
+      throw error;
+    }
+  });
 }

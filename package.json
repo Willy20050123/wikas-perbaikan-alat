@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run lint && npm run typecheck && node --test --experimental-strip-types tests/*.test.mts",
+    "change-password": "node --experimental-strip-types scripts/change-password.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push"

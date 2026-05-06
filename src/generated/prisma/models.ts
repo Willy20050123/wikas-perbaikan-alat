@@ -11,4 +11,5 @@
 export type * from './models/User'
 export type * from './models/Report'
 export type * from './models/PasswordResetToken'
+export type * from './models/RateLimitBucket'
 export type * from './commonInputTypes'

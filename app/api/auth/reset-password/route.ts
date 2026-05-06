@@ -9,11 +9,12 @@ export async function POST(req: Request) {
       return requestError;
     }
 
-    return NextResponse.json({
-      message: "Fitur reset password mandiri tidak tersedia. Hubungi admin.",
-    }, { status: 410 });
+    return NextResponse.json(
+      { message: "Reset password mandiri dinonaktifkan. Hubungi admin." },
+      { status: 410 }
+    );
   } catch (error) {
-    console.error("RESET_PASSWORD_ERROR:", error);
+    console.error("RESET_PASSWORD_DISABLED_ERROR:", error);
 
     return NextResponse.json(
       { message: "Terjadi kesalahan pada server." },

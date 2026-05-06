@@ -1,45 +1,212 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WIKAS Perbaikan Alat
 
-## Getting Started
+Internal web app for reporting damaged office/school equipment, reviewing reports, tracking repair workflow, and managing users.
 
-First, run the development server:
+Built with Next.js App Router, Prisma 7, MariaDB, bcrypt password hashing, JWT auth cookies, and Sonner notifications.
+
+## Main Features
+
+- User login with NIP and password.
+- User report submission with optional photo upload.
+- User report status tracking and edit/delete while report is still `MENUNGGU`.
+- Admin report approval, rejection, repair processing, completion notes, and completion photo.
+- Admin monthly report statistics.
+- Admin user management: create users, edit profile/role/NIP, reset password, soft-delete users.
+- Account page for users/admins to change their own password.
+
+## Requirements
+
+- Node.js 24 or newer is recommended.
+- MariaDB/MySQL database.
+- npm.
+
+## Environment Setup
+
+Copy `.env.example` to `.env` and fill the values:
+
+```env
+DATABASE_URL="mysql://user:password@localhost:3306/wikas_perbaikan_alat"
+AUTH_SECRET="replace-with-at-least-32-random-bytes"
+APP_ORIGIN="http://localhost:3000"
+SEED_PASSWORD=""
+```
+
+Required variables:
+
+- `DATABASE_URL`: MariaDB connection string.
+- `AUTH_SECRET`: long random secret, at least 32 characters in production.
+- `APP_ORIGIN`: allowed origin for same-origin mutation requests. Use your deployed HTTPS URL in production.
+- `SEED_PASSWORD`: only needed when running `scripts/seed.ts` manually.
+
+## Install
+
+```bash
+npm install
+npm run db:generate
+```
+
+## Database
+
+Run migrations in development:
+
+```bash
+npm run db:migrate
+```
+
+Push schema without migration history, usually only for quick local experiments:
+
+```bash
+npm run db:push
+```
+
+Generate Prisma client after schema changes:
+
+```bash
+npm run db:generate
+```
+
+Production deploys should run Prisma migrations before starting the app. The current schema includes `RateLimitBucket`, used for login rate limiting.
+
+## Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
+
+```text
+http://localhost:3000
+```
+
+## Production
+
+Build:
+
+```bash
+npm run build
+```
+
+Start:
+
+```bash
+npm run start
+```
+
+Before production release, run:
+
+```bash
+npm test
+npm run build
+```
+
+## Available Scripts
+
+- `npm run dev`: start the Next.js development server.
+- `npm run build`: create a production build.
+- `npm run start`: start the production server after building.
+- `npm run lint`: run ESLint.
+- `npm run typecheck`: run TypeScript type checking.
+- `npm test`: run lint, typecheck, and lightweight Node tests.
+- `npm run db:generate`: regenerate Prisma client.
+- `npm run db:migrate`: run Prisma migrations in development.
+- `npm run db:push`: push schema directly to the database.
+- `npm run change-password -- <nip> <password-baru>`: emergency password change script.
+
+## Emergency Password Change
+
+Prefer using the admin UI: `Dashboard Admin -> Kelola User -> Reset Password`.
+
+If you are locked out or need manual recovery, use:
+
+```bash
+npm run change-password -- 198501010000000001 "PasswordBaru123!"
+```
+
+Or with environment variables:
+
+```bash
+CHANGE_PASSWORD_NIP=198501010000000001 CHANGE_PASSWORD_NEW="PasswordBaru123!" npm run change-password
+```
+
+The script:
+
+- Finds the active user by NIP.
+- Validates password strength.
+- Hashes the password with bcrypt.
+- Updates the user password in the database.
+- Does not print the new password.
+
+Password rule:
+
+- Minimum 8 characters.
+- Contains a letter.
+- Contains a number.
+- Contains a symbol.
+
+## Seed Users
+
+The seed script is available at `scripts/seed.ts`, but there is no npm script for it by default. It requires `SEED_PASSWORD`.
+
+Example:
+
+```bash
+SEED_PASSWORD="Password123!" node --experimental-strip-types scripts/seed.ts
+```
+
+Use seed data carefully. It creates several admin/user accounts with the same seed password.
+
+## Authentication Notes
+
+- Auth uses an HTTP-only JWT cookie.
+- Cookie sessions include a password-derived session tag, so changing a password invalidates old sessions.
+- Users whose password is reset by an admin will need to log in again with the new password.
+- Self password changes refresh the current auth cookie automatically.
+- Independent forgot/reset password is disabled. Users should contact an admin.
+
+## Uploads
+
+Uploaded images are stored under:
+
+```text
+public/uploads
+```
+
+Image validation allows JPG, PNG, and WEBP, checks file size, and verifies image signatures.
+
+Production warning: `public/uploads` must be backed by persistent storage if deploying to multiple instances, Docker with ephemeral filesystems, or serverless environments.
+
+## Admin Safety Rules
+
+- Admins cannot delete their own active account.
+- Admins cannot demote their own active account.
+- The system prevents demoting the last active admin.
+- Users with active reports cannot be deleted.
+- Deleted users are soft-deleted so report history remains available.
+
+## Testing
+
+Run:
+
+```bash
+npm test
+```
+
+Current tests cover:
+
+- Password strength validation.
+- Report input validation.
+
+Add broader tests before public or high-risk deployment, especially for auth, admin user management, report workflow, and upload paths.
 
 ## Production Checklist
 
-Before deploying, configure the production environment from `.env.example`:
-
-- Set `DATABASE_URL` to the production MariaDB database.
-- Set `AUTH_SECRET` to a unique random value with at least 32 characters.
-- Set `APP_ORIGIN` to the deployed HTTPS origin.
-- Run Prisma migrations against the production database.
-- Ensure `public/uploads` is backed by persistent storage if the app is deployed on more than one instance or on ephemeral/serverless infrastructure.
-- Run `npm run lint`, `npx tsc --noEmit`, and `npm run build` before release.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Set `DATABASE_URL` to production MariaDB.
+- Set a strong production `AUTH_SECRET`.
+- Set `APP_ORIGIN` to the exact production HTTPS origin.
+- Run all Prisma migrations.
+- Ensure `public/uploads` is persistent and backed up.
+- Run `npm test`.
+- Run `npm run build`.
+- Confirm at least one active admin account exists.
+- Confirm HTTPS is enabled in front of the app.
