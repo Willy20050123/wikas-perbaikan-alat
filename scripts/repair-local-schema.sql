@@ -1,0 +1,19 @@
+ALTER TABLE `User` ADD COLUMN IF NOT EXISTS `activeNip` VARCHAR(191) NULL;
+ALTER TABLE `User` ADD COLUMN IF NOT EXISTS `deletedAt` DATETIME(3) NULL;
+
+UPDATE `User`
+SET `activeNip` = `nip`
+WHERE `deletedAt` IS NULL
+  AND `nip` IS NOT NULL
+  AND `activeNip` IS NULL;
+
+DROP INDEX IF EXISTS `User_nip_key` ON `User`;
+CREATE UNIQUE INDEX IF NOT EXISTS `User_activeNip_key` ON `User`(`activeNip`);
+
+CREATE TABLE IF NOT EXISTS `RateLimitBucket` (
+  `key` VARCHAR(191) NOT NULL,
+  `count` INTEGER NOT NULL DEFAULT 1,
+  `resetAt` DATETIME(3) NOT NULL,
+  `updatedAt` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`key`)
+);

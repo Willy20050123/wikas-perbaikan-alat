@@ -52,7 +52,9 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
-  Report: 'Report'
+  Report: 'Report',
+  PasswordResetToken: 'PasswordResetToken',
+  RateLimitBucket: 'RateLimitBucket'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -74,9 +76,12 @@ export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof
 export const UserScalarFieldEnum = {
   id: 'id',
   nama: 'nama',
-  email: 'email',
+  jabatan: 'jabatan',
+  nip: 'nip',
+  activeNip: 'activeNip',
   passwordHash: 'passwordHash',
   role: 'role',
+  deletedAt: 'deletedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -95,13 +100,41 @@ export const ReportScalarFieldEnum = {
   fotoUrl: 'fotoUrl',
   status: 'status',
   alasanPenolakan: 'alasanPenolakan',
+  assignedTechnician: 'assignedTechnician',
+  adminNotes: 'adminNotes',
+  completionNotes: 'completionNotes',
+  completionPhotoUrl: 'completionPhotoUrl',
   approvedAt: 'approvedAt',
   rejectedAt: 'rejectedAt',
+  processedAt: 'processedAt',
+  finishedAt: 'finishedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type ReportScalarFieldEnum = (typeof ReportScalarFieldEnum)[keyof typeof ReportScalarFieldEnum]
+
+
+export const PasswordResetTokenScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenHash: 'tokenHash',
+  expiresAt: 'expiresAt',
+  usedAt: 'usedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type PasswordResetTokenScalarFieldEnum = (typeof PasswordResetTokenScalarFieldEnum)[keyof typeof PasswordResetTokenScalarFieldEnum]
+
+
+export const RateLimitBucketScalarFieldEnum = {
+  key: 'key',
+  count: 'count',
+  resetAt: 'resetAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type RateLimitBucketScalarFieldEnum = (typeof RateLimitBucketScalarFieldEnum)[keyof typeof RateLimitBucketScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -112,15 +145,6 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
-export const UserOrderByRelevanceFieldEnum = {
-  nama: 'nama',
-  email: 'email',
-  passwordHash: 'passwordHash'
-} as const
-
-export type UserOrderByRelevanceFieldEnum = (typeof UserOrderByRelevanceFieldEnum)[keyof typeof UserOrderByRelevanceFieldEnum]
-
-
 export const NullsOrder = {
   first: 'first',
   last: 'last'
@@ -129,13 +153,42 @@ export const NullsOrder = {
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
+export const UserOrderByRelevanceFieldEnum = {
+  nama: 'nama',
+  jabatan: 'jabatan',
+  nip: 'nip',
+  activeNip: 'activeNip',
+  passwordHash: 'passwordHash'
+} as const
+
+export type UserOrderByRelevanceFieldEnum = (typeof UserOrderByRelevanceFieldEnum)[keyof typeof UserOrderByRelevanceFieldEnum]
+
+
 export const ReportOrderByRelevanceFieldEnum = {
   namaBarang: 'namaBarang',
   lokasi: 'lokasi',
   deskripsi: 'deskripsi',
   fotoUrl: 'fotoUrl',
-  alasanPenolakan: 'alasanPenolakan'
+  alasanPenolakan: 'alasanPenolakan',
+  assignedTechnician: 'assignedTechnician',
+  adminNotes: 'adminNotes',
+  completionNotes: 'completionNotes',
+  completionPhotoUrl: 'completionPhotoUrl'
 } as const
 
 export type ReportOrderByRelevanceFieldEnum = (typeof ReportOrderByRelevanceFieldEnum)[keyof typeof ReportOrderByRelevanceFieldEnum]
+
+
+export const PasswordResetTokenOrderByRelevanceFieldEnum = {
+  tokenHash: 'tokenHash'
+} as const
+
+export type PasswordResetTokenOrderByRelevanceFieldEnum = (typeof PasswordResetTokenOrderByRelevanceFieldEnum)[keyof typeof PasswordResetTokenOrderByRelevanceFieldEnum]
+
+
+export const RateLimitBucketOrderByRelevanceFieldEnum = {
+  key: 'key'
+} as const
+
+export type RateLimitBucketOrderByRelevanceFieldEnum = (typeof RateLimitBucketOrderByRelevanceFieldEnum)[keyof typeof RateLimitBucketOrderByRelevanceFieldEnum]
 

@@ -9,6 +9,7 @@ export default function UserStatusPage() {
   const router = useRouter();
   const [reports, setReports] = useState<StatusReportItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingReportId, setDeletingReportId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<
     "SEMUA" | "MENUNGGU" | "DISETUJUI" | "DITOLAK" | "DIPROSES" | "SELESAI"
@@ -44,6 +45,40 @@ export default function UserStatusPage() {
     void loadReports();
   }, []);
 
+  async function handleDeleteReport(reportId: number) {
+    const confirmed = window.confirm(
+      "Hapus laporan ini? Aksi ini hanya tersedia untuk laporan yang masih menunggu."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingReportId(reportId);
+      setMessage("");
+
+      const res = await fetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data.message || "Gagal menghapus laporan.");
+        return;
+      }
+
+      setMessage(data.message || "Laporan berhasil dihapus.");
+      await loadReports();
+    } catch (error) {
+      console.error("DELETE_REPORT_ERROR:", error);
+      setMessage("Terjadi kesalahan saat menghapus laporan.");
+    } finally {
+      setDeletingReportId(null);
+    }
+  }
+
   const filteredReports = useMemo(() => {
     if (filter === "SEMUA") return reports;
     return reports.filter((item) => item.status === filter);
@@ -57,7 +92,7 @@ export default function UserStatusPage() {
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
               Dashboard Pegawai
@@ -69,7 +104,7 @@ export default function UserStatusPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 md:justify-end">
             <button
               type="button"
               onClick={() => router.push("/dashboard/user")}
@@ -89,7 +124,7 @@ export default function UserStatusPage() {
         </div>
 
         <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Total Laporan
             </p>
@@ -97,7 +132,7 @@ export default function UserStatusPage() {
             <p className="mt-3 text-sm text-white/60">Semua laporan milik kamu.</p>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Menunggu
             </p>
@@ -105,7 +140,7 @@ export default function UserStatusPage() {
             <p className="mt-3 text-sm text-white/60">Menunggu keputusan admin.</p>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Disetujui
             </p>
@@ -113,7 +148,7 @@ export default function UserStatusPage() {
             <p className="mt-3 text-sm text-white/60">Sudah diterima admin.</p>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-xl">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.08] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/58">
               Ditolak
             </p>
@@ -122,7 +157,7 @@ export default function UserStatusPage() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-[28px] border border-white/10 bg-white/[0.08] p-4 backdrop-blur-xl">
+        <section className="mb-6 rounded-[28px] border border-white/10 bg-white/[0.08] p-4">
           <div className="flex flex-wrap gap-3">
             {[
               "SEMUA",
@@ -174,7 +209,12 @@ export default function UserStatusPage() {
             Memuat status laporan...
           </div>
         ) : (
-          <StatusList reports={filteredReports} />
+          <StatusList
+            reports={filteredReports}
+            deletingReportId={deletingReportId}
+            onEdit={(reportId) => router.push(`/dashboard/user/report/${reportId}`)}
+            onDelete={(reportId) => void handleDeleteReport(reportId)}
+          />
         )}
       </div>
     </div>

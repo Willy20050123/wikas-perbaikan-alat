@@ -27,3 +27,13 @@ export type User = Prisma.UserModel
  * 
  */
 export type Report = Prisma.ReportModel
+/**
+ * Model PasswordResetToken
+ * 
+ */
+export type PasswordResetToken = Prisma.PasswordResetTokenModel
+/**
+ * Model RateLimitBucket
+ * 
+ */
+export type RateLimitBucket = Prisma.RateLimitBucketModel

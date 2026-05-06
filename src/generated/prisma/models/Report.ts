@@ -47,8 +47,14 @@ export type ReportMinAggregateOutputType = {
   fotoUrl: string | null
   status: $Enums.ReportStatus | null
   alasanPenolakan: string | null
+  assignedTechnician: string | null
+  adminNotes: string | null
+  completionNotes: string | null
+  completionPhotoUrl: string | null
   approvedAt: Date | null
   rejectedAt: Date | null
+  processedAt: Date | null
+  finishedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -64,8 +70,14 @@ export type ReportMaxAggregateOutputType = {
   fotoUrl: string | null
   status: $Enums.ReportStatus | null
   alasanPenolakan: string | null
+  assignedTechnician: string | null
+  adminNotes: string | null
+  completionNotes: string | null
+  completionPhotoUrl: string | null
   approvedAt: Date | null
   rejectedAt: Date | null
+  processedAt: Date | null
+  finishedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -81,8 +93,14 @@ export type ReportCountAggregateOutputType = {
   fotoUrl: number
   status: number
   alasanPenolakan: number
+  assignedTechnician: number
+  adminNotes: number
+  completionNotes: number
+  completionPhotoUrl: number
   approvedAt: number
   rejectedAt: number
+  processedAt: number
+  finishedAt: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -110,8 +128,14 @@ export type ReportMinAggregateInputType = {
   fotoUrl?: true
   status?: true
   alasanPenolakan?: true
+  assignedTechnician?: true
+  adminNotes?: true
+  completionNotes?: true
+  completionPhotoUrl?: true
   approvedAt?: true
   rejectedAt?: true
+  processedAt?: true
+  finishedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -127,8 +151,14 @@ export type ReportMaxAggregateInputType = {
   fotoUrl?: true
   status?: true
   alasanPenolakan?: true
+  assignedTechnician?: true
+  adminNotes?: true
+  completionNotes?: true
+  completionPhotoUrl?: true
   approvedAt?: true
   rejectedAt?: true
+  processedAt?: true
+  finishedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -144,8 +174,14 @@ export type ReportCountAggregateInputType = {
   fotoUrl?: true
   status?: true
   alasanPenolakan?: true
+  assignedTechnician?: true
+  adminNotes?: true
+  completionNotes?: true
+  completionPhotoUrl?: true
   approvedAt?: true
   rejectedAt?: true
+  processedAt?: true
+  finishedAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -248,8 +284,14 @@ export type ReportGroupByOutputType = {
   fotoUrl: string | null
   status: $Enums.ReportStatus
   alasanPenolakan: string | null
+  assignedTechnician: string | null
+  adminNotes: string | null
+  completionNotes: string | null
+  completionPhotoUrl: string | null
   approvedAt: Date | null
   rejectedAt: Date | null
+  processedAt: Date | null
+  finishedAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: ReportCountAggregateOutputType | null
@@ -288,8 +330,14 @@ export type ReportWhereInput = {
   fotoUrl?: Prisma.StringNullableFilter<"Report"> | string | null
   status?: Prisma.EnumReportStatusFilter<"Report"> | $Enums.ReportStatus
   alasanPenolakan?: Prisma.StringNullableFilter<"Report"> | string | null
+  assignedTechnician?: Prisma.StringNullableFilter<"Report"> | string | null
+  adminNotes?: Prisma.StringNullableFilter<"Report"> | string | null
+  completionNotes?: Prisma.StringNullableFilter<"Report"> | string | null
+  completionPhotoUrl?: Prisma.StringNullableFilter<"Report"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   rejectedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
+  processedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
+  finishedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -306,8 +354,14 @@ export type ReportOrderByWithRelationInput = {
   fotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   alasanPenolakan?: Prisma.SortOrderInput | Prisma.SortOrder
+  assignedTechnician?: Prisma.SortOrderInput | Prisma.SortOrder
+  adminNotes?: Prisma.SortOrderInput | Prisma.SortOrder
+  completionNotes?: Prisma.SortOrderInput | Prisma.SortOrder
+  completionPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   rejectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -328,8 +382,14 @@ export type ReportWhereUniqueInput = Prisma.AtLeast<{
   fotoUrl?: Prisma.StringNullableFilter<"Report"> | string | null
   status?: Prisma.EnumReportStatusFilter<"Report"> | $Enums.ReportStatus
   alasanPenolakan?: Prisma.StringNullableFilter<"Report"> | string | null
+  assignedTechnician?: Prisma.StringNullableFilter<"Report"> | string | null
+  adminNotes?: Prisma.StringNullableFilter<"Report"> | string | null
+  completionNotes?: Prisma.StringNullableFilter<"Report"> | string | null
+  completionPhotoUrl?: Prisma.StringNullableFilter<"Report"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   rejectedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
+  processedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
+  finishedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -346,8 +406,14 @@ export type ReportOrderByWithAggregationInput = {
   fotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   alasanPenolakan?: Prisma.SortOrderInput | Prisma.SortOrder
+  assignedTechnician?: Prisma.SortOrderInput | Prisma.SortOrder
+  adminNotes?: Prisma.SortOrderInput | Prisma.SortOrder
+  completionNotes?: Prisma.SortOrderInput | Prisma.SortOrder
+  completionPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   rejectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ReportCountOrderByAggregateInput
@@ -371,8 +437,14 @@ export type ReportScalarWhereWithAggregatesInput = {
   fotoUrl?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
   status?: Prisma.EnumReportStatusWithAggregatesFilter<"Report"> | $Enums.ReportStatus
   alasanPenolakan?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
+  assignedTechnician?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
+  adminNotes?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
+  completionNotes?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
+  completionPhotoUrl?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
   approvedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Report"> | Date | string | null
   rejectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Report"> | Date | string | null
+  processedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Report"> | Date | string | null
+  finishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Report"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Report"> | Date | string
 }
@@ -386,8 +458,14 @@ export type ReportCreateInput = {
   fotoUrl?: string | null
   status?: $Enums.ReportStatus
   alasanPenolakan?: string | null
+  assignedTechnician?: string | null
+  adminNotes?: string | null
+  completionNotes?: string | null
+  completionPhotoUrl?: string | null
   approvedAt?: Date | string | null
   rejectedAt?: Date | string | null
+  processedAt?: Date | string | null
+  finishedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutReportsInput
@@ -404,8 +482,14 @@ export type ReportUncheckedCreateInput = {
   fotoUrl?: string | null
   status?: $Enums.ReportStatus
   alasanPenolakan?: string | null
+  assignedTechnician?: string | null
+  adminNotes?: string | null
+  completionNotes?: string | null
+  completionPhotoUrl?: string | null
   approvedAt?: Date | string | null
   rejectedAt?: Date | string | null
+  processedAt?: Date | string | null
+  finishedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -419,8 +503,14 @@ export type ReportUpdateInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutReportsNestedInput
@@ -437,8 +527,14 @@ export type ReportUncheckedUpdateInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -454,8 +550,14 @@ export type ReportCreateManyInput = {
   fotoUrl?: string | null
   status?: $Enums.ReportStatus
   alasanPenolakan?: string | null
+  assignedTechnician?: string | null
+  adminNotes?: string | null
+  completionNotes?: string | null
+  completionPhotoUrl?: string | null
   approvedAt?: Date | string | null
   rejectedAt?: Date | string | null
+  processedAt?: Date | string | null
+  finishedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -469,8 +571,14 @@ export type ReportUpdateManyMutationInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -486,8 +594,14 @@ export type ReportUncheckedUpdateManyInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -519,8 +633,14 @@ export type ReportCountOrderByAggregateInput = {
   fotoUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
   alasanPenolakan?: Prisma.SortOrder
+  assignedTechnician?: Prisma.SortOrder
+  adminNotes?: Prisma.SortOrder
+  completionNotes?: Prisma.SortOrder
+  completionPhotoUrl?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
   rejectedAt?: Prisma.SortOrder
+  processedAt?: Prisma.SortOrder
+  finishedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -541,8 +661,14 @@ export type ReportMaxOrderByAggregateInput = {
   fotoUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
   alasanPenolakan?: Prisma.SortOrder
+  assignedTechnician?: Prisma.SortOrder
+  adminNotes?: Prisma.SortOrder
+  completionNotes?: Prisma.SortOrder
+  completionPhotoUrl?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
   rejectedAt?: Prisma.SortOrder
+  processedAt?: Prisma.SortOrder
+  finishedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -558,8 +684,14 @@ export type ReportMinOrderByAggregateInput = {
   fotoUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
   alasanPenolakan?: Prisma.SortOrder
+  assignedTechnician?: Prisma.SortOrder
+  adminNotes?: Prisma.SortOrder
+  completionNotes?: Prisma.SortOrder
+  completionPhotoUrl?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
   rejectedAt?: Prisma.SortOrder
+  processedAt?: Prisma.SortOrder
+  finishedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -619,16 +751,8 @@ export type EnumReportSeverityFieldUpdateOperationsInput = {
   set?: $Enums.ReportSeverity
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type EnumReportStatusFieldUpdateOperationsInput = {
   set?: $Enums.ReportStatus
-}
-
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
 }
 
 export type ReportCreateWithoutUserInput = {
@@ -640,8 +764,14 @@ export type ReportCreateWithoutUserInput = {
   fotoUrl?: string | null
   status?: $Enums.ReportStatus
   alasanPenolakan?: string | null
+  assignedTechnician?: string | null
+  adminNotes?: string | null
+  completionNotes?: string | null
+  completionPhotoUrl?: string | null
   approvedAt?: Date | string | null
   rejectedAt?: Date | string | null
+  processedAt?: Date | string | null
+  finishedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -656,8 +786,14 @@ export type ReportUncheckedCreateWithoutUserInput = {
   fotoUrl?: string | null
   status?: $Enums.ReportStatus
   alasanPenolakan?: string | null
+  assignedTechnician?: string | null
+  adminNotes?: string | null
+  completionNotes?: string | null
+  completionPhotoUrl?: string | null
   approvedAt?: Date | string | null
   rejectedAt?: Date | string | null
+  processedAt?: Date | string | null
+  finishedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -702,8 +838,14 @@ export type ReportScalarWhereInput = {
   fotoUrl?: Prisma.StringNullableFilter<"Report"> | string | null
   status?: Prisma.EnumReportStatusFilter<"Report"> | $Enums.ReportStatus
   alasanPenolakan?: Prisma.StringNullableFilter<"Report"> | string | null
+  assignedTechnician?: Prisma.StringNullableFilter<"Report"> | string | null
+  adminNotes?: Prisma.StringNullableFilter<"Report"> | string | null
+  completionNotes?: Prisma.StringNullableFilter<"Report"> | string | null
+  completionPhotoUrl?: Prisma.StringNullableFilter<"Report"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   rejectedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
+  processedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
+  finishedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Report"> | Date | string
 }
@@ -718,8 +860,14 @@ export type ReportCreateManyUserInput = {
   fotoUrl?: string | null
   status?: $Enums.ReportStatus
   alasanPenolakan?: string | null
+  assignedTechnician?: string | null
+  adminNotes?: string | null
+  completionNotes?: string | null
+  completionPhotoUrl?: string | null
   approvedAt?: Date | string | null
   rejectedAt?: Date | string | null
+  processedAt?: Date | string | null
+  finishedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -733,8 +881,14 @@ export type ReportUpdateWithoutUserInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -749,8 +903,14 @@ export type ReportUncheckedUpdateWithoutUserInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -765,8 +925,14 @@ export type ReportUncheckedUpdateManyWithoutUserInput = {
   fotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
   alasanPenolakan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assignedTechnician?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completionPhotoUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -784,8 +950,14 @@ export type ReportSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   fotoUrl?: boolean
   status?: boolean
   alasanPenolakan?: boolean
+  assignedTechnician?: boolean
+  adminNotes?: boolean
+  completionNotes?: boolean
+  completionPhotoUrl?: boolean
   approvedAt?: boolean
   rejectedAt?: boolean
+  processedAt?: boolean
+  finishedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -804,13 +976,19 @@ export type ReportSelectScalar = {
   fotoUrl?: boolean
   status?: boolean
   alasanPenolakan?: boolean
+  assignedTechnician?: boolean
+  adminNotes?: boolean
+  completionNotes?: boolean
+  completionPhotoUrl?: boolean
   approvedAt?: boolean
   rejectedAt?: boolean
+  processedAt?: boolean
+  finishedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type ReportOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "kategori" | "namaBarang" | "lokasi" | "deskripsi" | "severity" | "fotoUrl" | "status" | "alasanPenolakan" | "approvedAt" | "rejectedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["report"]>
+export type ReportOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "kategori" | "namaBarang" | "lokasi" | "deskripsi" | "severity" | "fotoUrl" | "status" | "alasanPenolakan" | "assignedTechnician" | "adminNotes" | "completionNotes" | "completionPhotoUrl" | "approvedAt" | "rejectedAt" | "processedAt" | "finishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["report"]>
 export type ReportInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -831,8 +1009,14 @@ export type $ReportPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     fotoUrl: string | null
     status: $Enums.ReportStatus
     alasanPenolakan: string | null
+    assignedTechnician: string | null
+    adminNotes: string | null
+    completionNotes: string | null
+    completionPhotoUrl: string | null
     approvedAt: Date | null
     rejectedAt: Date | null
+    processedAt: Date | null
+    finishedAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["report"]>
@@ -1215,8 +1399,14 @@ export interface ReportFieldRefs {
   readonly fotoUrl: Prisma.FieldRef<"Report", 'String'>
   readonly status: Prisma.FieldRef<"Report", 'ReportStatus'>
   readonly alasanPenolakan: Prisma.FieldRef<"Report", 'String'>
+  readonly assignedTechnician: Prisma.FieldRef<"Report", 'String'>
+  readonly adminNotes: Prisma.FieldRef<"Report", 'String'>
+  readonly completionNotes: Prisma.FieldRef<"Report", 'String'>
+  readonly completionPhotoUrl: Prisma.FieldRef<"Report", 'String'>
   readonly approvedAt: Prisma.FieldRef<"Report", 'DateTime'>
   readonly rejectedAt: Prisma.FieldRef<"Report", 'DateTime'>
+  readonly processedAt: Prisma.FieldRef<"Report", 'DateTime'>
+  readonly finishedAt: Prisma.FieldRef<"Report", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"Report", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Report", 'DateTime'>
 }

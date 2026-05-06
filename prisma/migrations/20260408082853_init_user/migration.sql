@@ -1,4 +1,3 @@
--- CreateTable
 CREATE TABLE `User` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `nama` VARCHAR(191) NOT NULL,

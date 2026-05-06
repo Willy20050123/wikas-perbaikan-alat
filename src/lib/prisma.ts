@@ -2,23 +2,41 @@ import "dotenv/config";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../generated/prisma/client";
 
-const globalForPrisma = globalThis as unknown as {
+const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
 function createPrismaClient() {
-  const adapter = new PrismaMariaDb({
-    host: process.env.DATABASE_HOST || "127.0.0.1",
-    port: Number(process.env.DATABASE_PORT || 3307),
-    user: process.env.DATABASE_USER || "root",
-    password: process.env.DATABASE_PASSWORD || "",
-    database: process.env.DATABASE_NAME || "website_kantor",
-    connectionLimit: 5,
-  });
+  const connectionString = process.env.DATABASE_URL;
 
-  return new PrismaClient({
-    adapter,
-  });
+  if (!connectionString) {
+    throw new Error("DATABASE_URL belum diatur.");
+  }
+
+  const parsed = new URL(connectionString);
+  const database = parsed.pathname.replace(/^\//, "");
+
+  if (!database) {
+    throw new Error("Nama database pada DATABASE_URL tidak valid.");
+  }
+
+  const adapter = new PrismaMariaDb(
+    {
+      host: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : 3306,
+      user: decodeURIComponent(parsed.username || ""),
+      password: decodeURIComponent(parsed.password || ""),
+      database,
+      connectionLimit: 10,
+      acquireTimeout: 10_000,
+      connectTimeout: 10_000,
+    },
+    {
+      database,
+    }
+  );
+
+  return new PrismaClient({ adapter });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();

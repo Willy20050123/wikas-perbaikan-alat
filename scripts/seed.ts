@@ -1,50 +1,75 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
+import { validatePasswordStrength } from "../src/lib/passwords";
 
 async function main() {
-  const defaultPassword = "Admin123!";
-  const passwordHash = await bcrypt.hash(defaultPassword, 10);
+  const seedPassword = process.env.SEED_PASSWORD;
+
+  if (!seedPassword) {
+    throw new Error("Isi SEED_PASSWORD untuk menjalankan seed akun.");
+  }
+
+  const passwordErrors = validatePasswordStrength(seedPassword);
+
+  if (passwordErrors.length > 0) {
+    throw new Error(passwordErrors[0]);
+  }
+
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
 
   const users = [
     {
       nama: "Admin Utama",
-      email: "admin1@websitekantor.local",
+      jabatan: "Kepala Administrasi",
+      nip: "198501010000000001",
       role: "ADMIN",
     },
     {
       nama: "Admin Operasional",
-      email: "admin2@websitekantor.local",
+      jabatan: "Koordinator Operasional",
+      nip: "198501010000000002",
       role: "ADMIN",
     },
     {
       nama: "Admin Monitoring",
-      email: "admin3@websitekantor.local",
+      jabatan: "Analis Monitoring",
+      nip: "198501010000000003",
       role: "ADMIN",
     },
     {
       nama: "Admin Super",
-      email: "admin4@websitekantor.local",
+      jabatan: "Administrator Sistem",
+      nip: "198501010000000004",
       role: "ADMIN",
     },
     {
       nama: "User Biasa",
-      email: "user1@websitekantor.local",
+      jabatan: "Staff Umum",
+      nip: "198501010000000005",
       role: "USER",
     },
   ] as const;
 
   for (const user of users) {
     await prisma.user.upsert({
-      where: { email: user.email },
+      where: {
+        activeNip: user.nip,
+      },
       update: {
         nama: user.nama,
+        jabatan: user.jabatan,
+        nip: user.nip,
+        activeNip: user.nip,
+        deletedAt: null,
         role: user.role,
         passwordHash,
       },
       create: {
         nama: user.nama,
-        email: user.email,
+        jabatan: user.jabatan,
+        nip: user.nip,
+        activeNip: user.nip,
         role: user.role,
         passwordHash,
       },
@@ -52,12 +77,7 @@ async function main() {
   }
 
   console.log("Seed berhasil dijalankan.");
-  console.log("Akun yang tersedia:");
-  console.log("- admin1@websitekantor.local / Admin123!");
-  console.log("- admin2@websitekantor.local / Admin123!");
-  console.log("- admin3@websitekantor.local / Admin123!");
-  console.log("- admin4@websitekantor.local / Admin123!");
-  console.log("- user1@websitekantor.local / Admin123!");
+  console.log("Akun seed dibuat dengan password dari SEED_PASSWORD.");
 }
 
 main()
