@@ -111,7 +111,18 @@ npm run build
 - `npm run db:generate`: regenerate Prisma client.
 - `npm run db:migrate`: run Prisma migrations in development.
 - `npm run db:push`: push schema directly to the database.
+- `npm run db:repair-local`: repair common local database drift without deleting data.
 - `npm run change-password -- <nip> <password-baru>`: emergency password change script.
+
+## Local Database Drift Repair
+
+If your local database was created before the latest migrations and login fails with missing columns/tables such as `User.activeNip` or `RateLimitBucket`, run:
+
+```bash
+npm run db:repair-local
+```
+
+This adds the missing local columns/table used by the current app without resetting user/report data.
 
 ## Emergency Password Change
 

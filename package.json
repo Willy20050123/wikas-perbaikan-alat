@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run lint && npm run typecheck && node --test --experimental-strip-types tests/*.test.mts",
     "change-password": "node --experimental-strip-types scripts/change-password.ts",
+    "db:repair-local": "prisma db execute --file scripts/repair-local-schema.sql",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push"
