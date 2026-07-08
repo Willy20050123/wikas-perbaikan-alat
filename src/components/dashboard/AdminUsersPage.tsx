@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  Download,
   KeyRound,
   RefreshCcw,
   Save,
@@ -12,13 +13,38 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
+import type { AppCategoryScope, AppRole } from "@/src/lib/roles";
+import {
+  getCategoryScopeLabel,
+  getRoleLabel,
+  isCategoryScopedRole,
+} from "@/src/lib/roles";
+
+const ROLE_OPTIONS: AppRole[] = [
+  "USER",
+  "ADMIN_1",
+  "ADMIN_2",
+  "ADMIN_3",
+  "ADMIN_4",
+  "ADMIN_5",
+];
+
+const USER_PAGE_SIZE = 12;
+
+const CATEGORY_SCOPE_OPTIONS: AppCategoryScope[] = [
+  "FASILITAS_INVENTARIS",
+  "IT_ELEKTRONIK",
+  "LABORATORIUM",
+];
 
 type UserItem = {
   id: number;
   nama: string;
   jabatan: string | null;
   nip: string | null;
-  role: "ADMIN" | "USER";
+  role: AppRole;
+  isSuperAdmin: boolean;
+  categoryScope: AppCategoryScope | null;
   createdAt: string;
   _count: {
     reports: number;
@@ -32,7 +58,9 @@ type DraftMap = Record<
     nama: string;
     jabatan: string;
     nip: string;
-    role: "ADMIN" | "USER";
+    role: AppRole;
+    isSuperAdmin: boolean;
+    categoryScope: AppCategoryScope | "";
   }
 >;
 
@@ -66,22 +94,51 @@ export default function AdminUsersPage({
   const [drafts, setDrafts] = useState<DraftMap>({});
   const [passwordDrafts, setPasswordDrafts] = useState<PasswordDraftMap>({});
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
   const [newUser, setNewUser] = useState({
     nama: "",
     jabatan: "",
     nip: "",
-    role: "USER" as "ADMIN" | "USER",
+    role: "USER" as AppRole,
+    isSuperAdmin: false,
+    categoryScope: "" as AppCategoryScope | "",
     password: "",
   });
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async (options: {
+    append?: boolean;
+    search?: string;
+    offset?: number;
+  } = {}) => {
+    const append = options.append === true;
+    const search = options.search ?? "";
+    const offset = options.offset ?? 0;
+
     try {
-      setLoading(true);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
       setMessage("");
 
-      const res = await fetch("/api/admin/users", {
+      const params = new URLSearchParams({
+        limit: String(USER_PAGE_SIZE),
+        offset: String(offset),
+      });
+
+      if (search.trim()) {
+        params.set("q", search.trim());
+      }
+
+      const res = await fetch(`/api/admin/users?${params.toString()}`, {
         cache: "no-store",
       });
       const data = await readApiResponse(res);
@@ -97,20 +154,14 @@ export default function AdminUsersPage({
       }
 
       const loadedUsers = data.users || [];
-      setUsers(loadedUsers);
-      setDrafts(
-        Object.fromEntries(
-          loadedUsers.map((user: UserItem) => [
-            user.id,
-            {
-              nama: user.nama,
-              jabatan: user.jabatan || "",
-              nip: user.nip || "",
-              role: user.role,
-            },
-          ])
-        )
-      );
+      setUsers((current) => (append ? [...current, ...loadedUsers] : loadedUsers));
+      setTotalUsers(Number(data.total || 0));
+
+      if (!append) {
+        setDrafts({});
+        setPasswordDrafts({});
+        setExpandedUserId(null);
+      }
     } catch (error) {
       console.error("LOAD_ADMIN_USERS_ERROR:", error);
       const errorMessage = "Terjadi kesalahan saat memuat daftar user.";
@@ -121,12 +172,23 @@ export default function AdminUsersPage({
       });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void loadUsers();
-  }, []);
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    void loadUsers({ search: debouncedSearchQuery });
+  }, [debouncedSearchQuery, loadUsers]);
 
   async function handleCreateUser() {
     try {
@@ -160,9 +222,11 @@ export default function AdminUsersPage({
         jabatan: "",
         nip: "",
         role: "USER",
+        isSuperAdmin: false,
+        categoryScope: "",
         password: "",
       });
-      await loadUsers();
+      await loadUsers({ search: debouncedSearchQuery });
     } catch (error) {
       console.error("CREATE_ADMIN_USER_ERROR:", error);
       const errorMessage = "Terjadi kesalahan saat membuat user.";
@@ -175,7 +239,19 @@ export default function AdminUsersPage({
   }
 
   async function handleSaveUser(userId: number) {
-    const draft = drafts[userId];
+    const user = users.find((item) => item.id === userId);
+    const draft =
+      drafts[userId] ||
+      (user
+        ? {
+            nama: user.nama,
+            jabatan: user.jabatan || "",
+            nip: user.nip || "",
+            role: user.role,
+            isSuperAdmin: user.isSuperAdmin,
+            categoryScope: user.categoryScope || "",
+          }
+        : null);
 
     if (!draft) {
       return;
@@ -207,7 +283,13 @@ export default function AdminUsersPage({
       toast.success("User diperbarui", {
         description: responseMessage,
       });
-      await loadUsers();
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      });
+      setExpandedUserId(null);
+      await loadUsers({ search: debouncedSearchQuery });
     } catch (error) {
       console.error("UPDATE_ADMIN_USER_ERROR:", error);
       const errorMessage = "Terjadi kesalahan saat memperbarui user.";
@@ -298,6 +380,8 @@ export default function AdminUsersPage({
         description: responseMessage,
       });
       setUsers((current) => current.filter((user) => user.id !== userId));
+      setTotalUsers((current) => Math.max(current - 1, 0));
+      setExpandedUserId((current) => (current === userId ? null : current));
       setDrafts((current) => {
         const next = { ...current };
         delete next[userId];
@@ -314,46 +398,100 @@ export default function AdminUsersPage({
     }
   }
 
-  const filteredUsers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+  const hiddenUserCount = Math.max(totalUsers - users.length, 0);
 
-    if (!query) {
-      return users;
-    }
-
-    return users.filter((user) =>
-      [
-        user.nama,
-        user.jabatan || "",
-        user.nip || "",
-        user.role,
-        String(user.id),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
+  function getDraftForUser(user: UserItem) {
+    return (
+      drafts[user.id] || {
+        nama: user.nama,
+        jabatan: user.jabatan || "",
+        nip: user.nip || "",
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin,
+        categoryScope: user.categoryScope || "",
+      }
     );
-  }, [searchQuery, users]);
+  }
+
+  async function handleExportUsers() {
+    try {
+      setExporting(true);
+      setMessage("");
+
+      const res = await fetch("/api/admin/users/export", {
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const data = await readApiResponse(res);
+        setMessage(data.message || "Gagal mengekspor daftar user.");
+        return;
+      }
+
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("content-disposition") || "";
+      const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] || "daftar-user.xlsx";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("EXPORT_ADMIN_USERS_ERROR:", error);
+      setMessage("Terjadi kesalahan saat mengekspor daftar user.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function toggleExpandedUser(user: UserItem) {
+    setExpandedUserId((current) => {
+      if (current === user.id) {
+        return null;
+      }
+
+      setDrafts((drafts) => ({
+        ...drafts,
+        [user.id]: getDraftForUser(user),
+      }));
+
+      return user.id;
+    });
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 px-8 py-10 text-slate-900 sm:px-12 lg:px-20 xl:px-24">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-100/75">
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-blue-600">
               Admin Panel
             </p>
             <h1 className="mt-2 text-3xl font-bold md:text-5xl">Kelola User</h1>
-            <p className="mt-3 max-w-3xl text-white/70">
-              Buat akun pegawai atau admin baru, perbarui identitas internal, dan reset password tanpa memakai script manual.
+            <p className="mt-3 max-w-3xl text-slate-600">
+              Buat akun, atur role, dan reset password tanpa memakai script manual.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3 md:justify-end">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
             <button
               type="button"
-              onClick={() => void loadUsers()}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/15"
+              onClick={() => router.push("/dashboard/admin")}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Kembali ke Dashboard
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void loadUsers({ search: debouncedSearchQuery })}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50"
             >
               <RefreshCcw className="h-4 w-4" />
               Muat Ulang
@@ -361,139 +499,191 @@ export default function AdminUsersPage({
 
             <button
               type="button"
-              onClick={() => router.push("/dashboard/admin")}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/15"
+              onClick={() => void handleExportUsers()}
+              disabled={exporting}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Kembali ke Dashboard
+              <Download className="h-4 w-4" />
+              {exporting ? "Mengekspor..." : "Export Excel"}
             </button>
           </div>
         </div>
 
         {message ? (
-          <div className="mb-6 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm">
+          <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
             {message}
           </div>
         ) : null}
 
-        <section className="mb-8 rounded-[32px] border border-white/10 bg-white/[0.08] p-6 shadow-[0_24px_60px_rgba(2,6,23,0.16)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/18 bg-cyan-400/10">
-              <UserPlus className="h-6 w-6 text-cyan-100" />
+        <section className="mb-5 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-100 bg-blue-50">
+                <UserPlus className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Tambah User</h2>
+                <p className="text-xs text-slate-500">
+                  Form dibuka hanya saat dibutuhkan.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white">Tambah User</h2>
-              <p className="text-sm text-white/60">
-                Buat akun baru untuk pegawai atau admin.
-              </p>
-            </div>
-          </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <input
-              value={newUser.nama}
-              onChange={(event) =>
-                setNewUser((current) => ({ ...current, nama: event.target.value }))
-              }
-              placeholder="Nama"
-              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
-            />
-
-            <input
-              value={newUser.jabatan}
-              onChange={(event) =>
-                setNewUser((current) => ({ ...current, jabatan: event.target.value }))
-              }
-              placeholder="Jabatan"
-              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
-            />
-
-            <input
-              value={newUser.nip}
-              onChange={(event) =>
-                setNewUser((current) => ({ ...current, nip: event.target.value }))
-              }
-              placeholder="NIP"
-              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
-            />
-
-            <select
-              value={newUser.role}
-              onChange={(event) =>
-                setNewUser((current) => ({
-                  ...current,
-                  role: event.target.value as "ADMIN" | "USER",
-                }))
-              }
-              className="h-14 rounded-2xl border border-white/10 bg-slate-900/80 px-4 text-white outline-none"
+            <button
+              type="button"
+              onClick={() => setShowCreateForm((current) => !current)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
             >
-              <option value="USER">USER</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-
-            <input
-              type="password"
-              value={newUser.password}
-              onChange={(event) =>
-                setNewUser((current) => ({ ...current, password: event.target.value }))
-              }
-              placeholder="Password"
-              className="h-14 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-white/35"
-            />
+              <UserPlus className="h-4 w-4" />
+              {showCreateForm ? "Tutup Form" : "Tambah User"}
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCreateUser}
-            className="mt-5 inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 font-semibold text-white transition hover:bg-cyan-400"
-          >
-            <UserPlus className="h-4 w-4" />
-            Buat User
-          </button>
+          {showCreateForm ? (
+            <>
+              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-5">
+                <input
+                  value={newUser.nama}
+                  onChange={(event) =>
+                    setNewUser((current) => ({
+                      ...current,
+                      nama: event.target.value,
+                    }))
+                  }
+                  placeholder="Nama"
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+
+                <input
+                  value={newUser.nip}
+                  onChange={(event) =>
+                    setNewUser((current) => ({
+                      ...current,
+                      nip: event.target.value,
+                    }))
+                  }
+                  placeholder="NIP"
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+
+                <select
+                  value={newUser.role}
+                  onChange={(event) =>
+                    setNewUser((current) => ({
+                      ...current,
+                      role: event.target.value as AppRole,
+                      categoryScope: isCategoryScopedRole(event.target.value)
+                        ? current.categoryScope
+                        : "",
+                    }))
+                  }
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>
+                      {getRoleLabel(role)}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={newUser.categoryScope}
+                  onChange={(event) =>
+                    setNewUser((current) => ({
+                      ...current,
+                      categoryScope: event.target.value as AppCategoryScope | "",
+                    }))
+                  }
+                  disabled={!isCategoryScopedRole(newUser.role)}
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="">Kategori</option>
+                  {CATEGORY_SCOPE_OPTIONS.map((category) => (
+                    <option key={category} value={category}>
+                      {getCategoryScopeLabel(category)}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(event) =>
+                    setNewUser((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
+                  }
+                  placeholder="Password"
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+
+                <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={newUser.isSuperAdmin}
+                    onChange={(event) =>
+                      setNewUser((current) => ({
+                        ...current,
+                        isSuperAdmin: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 accent-blue-600"
+                  />
+                  Super Admin
+                </label>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCreateUser}
+                className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+              >
+                <UserPlus className="h-4 w-4" />
+                Buat User
+              </button>
+            </>
+          ) : null}
         </section>
 
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.08] shadow-[0_24px_60px_rgba(2,6,23,0.16)]">
-          <div className="border-b border-white/10 px-6 py-5">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-blue-100 bg-blue-50/30 px-6 py-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">Daftar User</h2>
-                <p className="mt-1 text-sm text-white/55">
-                  {filteredUsers.length} dari {users.length} user ditampilkan.
+                <h2 className="text-2xl font-bold text-slate-950">Daftar User</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {users.length} dari {totalUsers} user ditampilkan.
                 </p>
               </div>
 
               <label className="relative block w-full lg:max-w-md">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Cari nama, NIP, jabatan, atau role"
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 py-3 pl-11 pr-4 text-white outline-none placeholder:text-white/35 focus:border-cyan-300/30"
+                  placeholder="Cari nama, NIP, atau role"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </label>
             </div>
           </div>
 
           {loading ? (
-            <div className="px-6 py-8 text-white/70">Memuat daftar user...</div>
+            <div className="px-6 py-8 text-slate-600">Memuat daftar user...</div>
+          ) : users.length === 0 && !debouncedSearchQuery.trim() ? (
+            <div className="px-6 py-8 text-slate-600">Belum ada user.</div>
           ) : users.length === 0 ? (
-            <div className="px-6 py-8 text-white/70">Belum ada user.</div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="px-6 py-8 text-white/70">
+            <div className="px-6 py-8 text-slate-600">
               Tidak ada user yang cocok dengan pencarian.
             </div>
           ) : (
-            <div className="space-y-4 p-6">
-              {filteredUsers.map((user) => {
-                const draft = drafts[user.id] || {
-                  nama: user.nama,
-                  jabatan: user.jabatan || "",
-                  nip: user.nip || "",
-                  role: user.role,
-                };
+            <div className="space-y-2 p-4">
+              {users.map((user) => {
+                const draft = getDraftForUser(user);
                 const activeReportCount = user._count.activeReports || 0;
                 const canDeleteUser =
                   activeReportCount === 0 && user.id !== currentUserId;
+                const expanded = expandedUserId === user.id;
                 const deletionStatus =
                   user.id === currentUserId
                     ? "Akun admin aktif tidak bisa dihapus."
@@ -506,29 +696,54 @@ export default function AdminUsersPage({
                 return (
                   <div
                     key={user.id}
-                    className="rounded-[28px] border border-white/10 bg-white/[0.05] p-5"
+                    className="rounded-2xl border border-slate-200 bg-white shadow-sm"
                   >
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr_180px_auto]">
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-white/55">NIP</p>
-                          <p className="mt-1 font-semibold text-white">
-                            {user.nip || "-"}
-                          </p>
-                        </div>
+                    <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-slate-950">
+                          {user.nama}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          NIP: {user.nip || "-"}
+                        </p>
+                      </div>
 
-                        <div>
-                          <p className="text-sm text-white/55">Jabatan</p>
-                          <p className="mt-1 font-semibold text-white">
-                            {user.jabatan || "-"}
-                          </p>
-                        </div>
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 font-semibold text-blue-700">
+                          {getRoleLabel(user.role)}
+                        </span>
+                        {user.isSuperAdmin ? (
+                          <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 font-semibold text-violet-700">
+                            Super Admin
+                          </span>
+                        ) : null}
+                        {isCategoryScopedRole(user.role) ? (
+                          <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-cyan-700">
+                            {getCategoryScopeLabel(user.categoryScope)}
+                          </span>
+                        ) : null}
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-600">
+                          {user._count.reports} laporan
+                        </span>
+                        <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-amber-700">
+                          {activeReportCount} aktif
+                        </span>
+                      </div>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                          <div>
-                            <label className="mb-2 block text-sm text-white/60">
-                              Nama
-                            </label>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedUser(user)}
+                        className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+                      >
+                        {expanded ? "Tutup" : "Kelola"}
+                      </button>
+                    </div>
+
+                    {expanded ? (
+                      <div className="border-t border-slate-100 bg-slate-50/60 p-3">
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+                          <label className="grid gap-1 text-xs font-medium text-slate-500">
+                            Nama
                             <input
                               value={draft.nama}
                               onChange={(event) =>
@@ -540,14 +755,12 @@ export default function AdminUsersPage({
                                   },
                                 }))
                               }
-                              className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                             />
-                          </div>
+                          </label>
 
-                          <div>
-                            <label className="mb-2 block text-sm text-white/60">
-                              NIP
-                            </label>
+                          <label className="grid gap-1 text-xs font-medium text-slate-500">
+                            NIP
                             <input
                               value={draft.nip}
                               onChange={(event) =>
@@ -559,121 +772,161 @@ export default function AdminUsersPage({
                                   },
                                 }))
                               }
-                              className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                             />
-                          </div>
+                          </label>
 
-                          <div>
-                            <label className="mb-2 block text-sm text-white/60">
-                              Jabatan
-                            </label>
-                            <input
-                              value={draft.jabatan}
+                          <label className="grid gap-1 text-xs font-medium text-slate-500">
+                            Role
+                            <select
+                              value={draft.role}
                               onChange={(event) =>
                                 setDrafts((current) => ({
                                   ...current,
                                   [user.id]: {
                                     ...draft,
-                                    jabatan: event.target.value,
+                                    role: event.target.value as AppRole,
+                                    categoryScope: isCategoryScopedRole(
+                                      event.target.value,
+                                    )
+                                      ? draft.categoryScope
+                                      : "",
                                   },
                                 }))
                               }
-                              className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            >
+                              {ROLE_OPTIONS.map((role) => (
+                                <option key={role} value={role}>
+                                  {getRoleLabel(role)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="grid gap-1 text-xs font-medium text-slate-500">
+                            Kategori
+                            <select
+                              value={draft.categoryScope}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: {
+                                    ...draft,
+                                    categoryScope: event.target
+                                      .value as AppCategoryScope | "",
+                                  },
+                                }))
+                              }
+                              disabled={!isCategoryScopedRole(draft.role)}
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                              <option value="">Tidak khusus</option>
+                              {CATEGORY_SCOPE_OPTIONS.map((category) => (
+                                <option key={category} value={category}>
+                                  {getCategoryScopeLabel(category)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="grid gap-1 text-xs font-medium text-slate-500">
+                            Password Baru
+                            <input
+                              type="password"
+                              value={passwordDrafts[user.id] || ""}
+                              onChange={(event) =>
+                                setPasswordDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: event.target.value,
+                                }))
+                              }
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                             />
+                          </label>
+
+                          <label className="grid gap-1 text-xs font-medium text-slate-500">
+                            Akses
+                            <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={draft.isSuperAdmin}
+                                onChange={(event) =>
+                                  setDrafts((current) => ({
+                                    ...current,
+                                    [user.id]: {
+                                      ...draft,
+                                      isSuperAdmin: event.target.checked,
+                                    },
+                                  }))
+                                }
+                                className="h-4 w-4 accent-blue-600"
+                              />
+                              Super Admin
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <p className="text-xs leading-5 text-slate-500">
+                            {deletionStatus}
+                          </p>
+
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveUser(user.id)}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500"
+                            >
+                              <Save className="h-4 w-4" />
+                              Simpan
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={!passwordDrafts[user.id]}
+                              onClick={() => void handleResetPassword(user.id)}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <KeyRound className="h-4 w-4" />
+                              Reset Password
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={!canDeleteUser}
+                              onClick={() => void handleDeleteUser(user.id)}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Hapus
+                            </button>
                           </div>
                         </div>
                       </div>
-
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                          <p className="text-sm text-white/55">Role</p>
-                          <select
-                            value={draft.role}
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [user.id]: {
-                                  ...draft,
-                                  role: event.target.value as "ADMIN" | "USER",
-                                },
-                              }))
-                            }
-                            className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 text-white outline-none"
-                          >
-                            <option value="USER">USER</option>
-                            <option value="ADMIN">ADMIN</option>
-                          </select>
-                        </div>
-
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                          <p className="text-sm text-white/55">Jumlah Laporan</p>
-                          <p className="mt-2 text-2xl font-bold text-white">
-                            {user._count.reports}
-                          </p>
-                          <p className="mt-1 text-xs text-white/50">
-                            Aktif: {activeReportCount}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                          <label className="mb-2 block text-sm text-white/60">
-                            Password Baru
-                          </label>
-                          <input
-                            type="password"
-                            value={passwordDrafts[user.id] || ""}
-                            onChange={(event) =>
-                              setPasswordDrafts((current) => ({
-                                ...current,
-                                [user.id]: event.target.value,
-                              }))
-                            }
-                            className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-sm text-white/55">Status Penghapusan</p>
-                        <p className="mt-2 text-sm text-white/75">
-                          {deletionStatus}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleSaveUser(user.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-400"
-                        >
-                          <Save className="h-4 w-4" />
-                          Simpan
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={!passwordDrafts[user.id]}
-                          onClick={() => void handleResetPassword(user.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <KeyRound className="h-4 w-4" />
-                          Reset Password
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={!canDeleteUser}
-                          onClick={() => void handleDeleteUser(user.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Hapus
-                        </button>
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
                 );
               })}
+
+              {hiddenUserCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadUsers({
+                      append: true,
+                      search: debouncedSearchQuery,
+                      offset: users.length,
+                    })
+                  }
+                  disabled={loadingMore}
+                  className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                >
+                  {loadingMore
+                    ? "Memuat..."
+                    : `Tampilkan ${Math.min(USER_PAGE_SIZE, hiddenUserCount)} user lagi`}
+                </button>
+              ) : null}
             </div>
           )}
         </section>

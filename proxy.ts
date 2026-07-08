@@ -13,13 +13,16 @@ function getAuthPayload(request: NextRequest) {
   return verifyAuthToken(token);
 }
 
-function getDefaultDashboard(role: AppRole) {
-  return isAdminRole(role) ? "/dashboard/admin" : "/dashboard/user";
+function getDefaultDashboard(auth: { role: AppRole; isSuperAdmin?: boolean }) {
+  return auth.isSuperAdmin || isAdminRole(auth.role)
+    ? "/dashboard/admin"
+    : "/dashboard/user";
 }
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const auth = getAuthPayload(request);
+  const hasAuthCookie = request.cookies.has(AUTH_COOKIE_NAME);
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute =
@@ -27,7 +30,24 @@ export function proxy(request: NextRequest) {
     pathname === "/forgot-password" ||
     pathname.startsWith("/reset-password/");
 
+  if (isAuthRoute && request.nextUrl.searchParams.get("expired") === "1") {
+    const response = NextResponse.next();
+    response.cookies.delete(AUTH_COOKIE_NAME);
+
+    return response;
+  }
+
   if (!auth) {
+    if (hasAuthCookie) {
+      const response = isDashboardRoute
+        ? NextResponse.redirect(new URL("/login?expired=1", request.url))
+        : NextResponse.next();
+
+      response.cookies.delete(AUTH_COOKIE_NAME);
+
+      return response;
+    }
+
     if (isDashboardRoute) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -35,7 +55,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const defaultDashboard = getDefaultDashboard(auth.role);
+  const defaultDashboard = getDefaultDashboard(auth);
 
   if (pathname === "/dashboard") {
     return NextResponse.redirect(new URL(defaultDashboard, request.url));
@@ -45,7 +65,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(defaultDashboard, request.url));
   }
 
-  if (pathname.startsWith("/dashboard/admin") && !isAdminRole(auth.role)) {
+  if (
+    pathname.startsWith("/dashboard/admin") &&
+    !auth.isSuperAdmin &&
+    !isAdminRole(auth.role)
+  ) {
     return NextResponse.redirect(new URL("/dashboard/user", request.url));
   }
 

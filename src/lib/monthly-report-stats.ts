@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/src/lib/prisma";
+import { getRoleLabel, type AppCategoryScope } from "@/src/lib/roles";
 import type { MonthlyStatsResponse } from "@/src/lib/monthly-report-stats-types";
 import type { ReportStatus } from "@/src/lib/workflow";
 
@@ -13,6 +14,7 @@ type MonthlyReportStatsInput = {
   month?: number | string | null;
   year?: number | string | null;
   status?: string | null;
+  categoryScope?: AppCategoryScope | null;
 };
 
 const REPORT_CATEGORIES: ReportCategory[] = [
@@ -27,7 +29,6 @@ const REPORT_STATUSES: ReportStatus[] = [
   "MENUNGGU_ADMIN_3",
   "MENUNGGU_ADMIN_4",
   "MENUNGGU_ADMIN_5",
-  "MENUNGGU_ADMIN_6",
   "DISETUJUI_FINAL",
   "DITOLAK",
 ];
@@ -86,7 +87,6 @@ function createEmptyStatusCounts(): Record<ReportStatus, number> {
     MENUNGGU_ADMIN_3: 0,
     MENUNGGU_ADMIN_4: 0,
     MENUNGGU_ADMIN_5: 0,
-    MENUNGGU_ADMIN_6: 0,
     DISETUJUI_FINAL: 0,
     DITOLAK: 0,
   };
@@ -116,8 +116,12 @@ function getTopCategoryLabel(categoryCounts: Record<ReportCategory, number>) {
   return topCategory ? getCategoryLabel(topCategory) : "-";
 }
 
-async function getDefaultStatsPeriod(now: Date) {
+async function getDefaultStatsPeriod(
+  now: Date,
+  categoryScope?: AppCategoryScope | null,
+) {
   const latestReport = await prisma.report.findFirst({
+    where: categoryScope ? { kategori: categoryScope } : undefined,
     select: {
       createdAt: true,
     },
@@ -138,7 +142,7 @@ export async function getMonthlyReportStats(
   input: MonthlyReportStatsInput = {}
 ): Promise<MonthlyStatsResponse> {
   const now = new Date();
-  const defaultPeriod = await getDefaultStatsPeriod(now);
+  const defaultPeriod = await getDefaultStatsPeriod(now, input.categoryScope);
 
   const month = parseMonth(input.month, defaultPeriod.month);
   const year = parseYear(input.year, defaultPeriod.year);
@@ -157,6 +161,7 @@ export async function getMonthlyReportStats(
         lt: end,
       },
       ...(selectedStatus !== "SEMUA" ? { status: selectedStatus } : {}),
+      ...(input.categoryScope ? { kategori: input.categoryScope } : {}),
     },
     select: {
       userId: true,
@@ -296,33 +301,28 @@ export async function getMonthlyReportStats(
     statusBreakdown: [
       {
         key: "MENUNGGU_ADMIN_1",
-        label: "Menunggu Admin 1",
+        label: `Menunggu ${getRoleLabel("ADMIN_1")}`,
         total: statusCounts.MENUNGGU_ADMIN_1,
       },
       {
         key: "MENUNGGU_ADMIN_2",
-        label: "Menunggu Admin 2",
+        label: `Menunggu ${getRoleLabel("ADMIN_2")}`,
         total: statusCounts.MENUNGGU_ADMIN_2,
       },
       {
         key: "MENUNGGU_ADMIN_3",
-        label: "Menunggu Admin 3",
+        label: `Menunggu ${getRoleLabel("ADMIN_3")}`,
         total: statusCounts.MENUNGGU_ADMIN_3,
       },
       {
         key: "MENUNGGU_ADMIN_4",
-        label: "Menunggu Admin 4",
+        label: `Menunggu ${getRoleLabel("ADMIN_4")}`,
         total: statusCounts.MENUNGGU_ADMIN_4,
       },
       {
         key: "MENUNGGU_ADMIN_5",
-        label: "Menunggu Admin 5",
+        label: `Menunggu ${getRoleLabel("ADMIN_5")}`,
         total: statusCounts.MENUNGGU_ADMIN_5,
-      },
-      {
-        key: "MENUNGGU_ADMIN_6",
-        label: "Menunggu Admin 6",
-        total: statusCounts.MENUNGGU_ADMIN_6,
       },
       {
         key: "DISETUJUI_FINAL",

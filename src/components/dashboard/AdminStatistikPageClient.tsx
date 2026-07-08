@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   BarChart3,
+  Download,
   Filter,
   RefreshCcw,
   Users,
 } from "lucide-react";
 import MonthlyStatsCards from "@/src/components/dashboard/MonthlyStatsCards";
 import MonthlyReporterTable from "@/src/components/dashboard/MonthlyReporterTable";
+import { getRoleLabel } from "@/src/lib/roles";
 import type { ReportStatus } from "@/lib/report-helpers";
 import type { MonthlyStatsResponse } from "@/src/lib/monthly-report-stats-types";
 
@@ -35,12 +37,11 @@ const MONTH_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: "SEMUA", label: "Semua Status" },
-  { value: "MENUNGGU_ADMIN_1", label: "Menunggu Admin 1" },
-  { value: "MENUNGGU_ADMIN_2", label: "Menunggu Admin 2" },
-  { value: "MENUNGGU_ADMIN_3", label: "Menunggu Admin 3" },
-  { value: "MENUNGGU_ADMIN_4", label: "Menunggu Admin 4" },
-  { value: "MENUNGGU_ADMIN_5", label: "Menunggu Admin 5" },
-  { value: "MENUNGGU_ADMIN_6", label: "Menunggu Admin 6" },
+  { value: "MENUNGGU_ADMIN_1", label: `Menunggu ${getRoleLabel("ADMIN_1")}` },
+  { value: "MENUNGGU_ADMIN_2", label: `Menunggu ${getRoleLabel("ADMIN_2")}` },
+  { value: "MENUNGGU_ADMIN_3", label: `Menunggu ${getRoleLabel("ADMIN_3")}` },
+  { value: "MENUNGGU_ADMIN_4", label: `Menunggu ${getRoleLabel("ADMIN_4")}` },
+  { value: "MENUNGGU_ADMIN_5", label: `Menunggu ${getRoleLabel("ADMIN_5")}` },
   { value: "DISETUJUI_FINAL", label: "Disetujui Final" },
   { value: "DITOLAK", label: "Ditolak" },
 ] as const;
@@ -150,6 +151,19 @@ export default function AdminStatistikPageClient({
     void loadStats(defaultMonth, defaultYear, defaultStatus);
   }
 
+  function handleExport() {
+    const params = new URLSearchParams({
+      month: String(selectedMonth),
+      year: String(selectedYear),
+    });
+
+    if (selectedStatus !== "SEMUA") {
+      params.set("status", selectedStatus);
+    }
+
+    window.location.href = `/api/reports/stats/monthly/export?${params.toString()}`;
+  }
+
   const isRefreshingStats = refreshing || isPending;
   const isBusy = loading || refreshing || isPending;
   const showInitialLoader = loading && !stats;
@@ -159,16 +173,16 @@ export default function AdminStatistikPageClient({
     "Periode terpilih";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 px-4 py-10 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 px-8 py-10 text-slate-900 sm:px-12 lg:px-20 xl:px-24">
       <div className="mx-auto max-w-[1500px]">
-        <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
               <BarChart3 className="h-4 w-4" />
               Statistik Laporan
             </div>
 
-            <h1 className="mt-4 text-3xl font-bold tracking-[-0.03em] text-slate-950 md:text-5xl">
+            <h1 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-slate-950 md:text-4xl">
               Statistik Laporan
             </h1>
             <p className="mt-3 max-w-3xl text-slate-600">
@@ -177,24 +191,37 @@ export default function AdminStatistikPageClient({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/admin")}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
-          >
-            <ArrowLeft className="h-4 w-4 text-blue-600" />
-            Kembali ke Dashboard
-          </button>
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/admin")}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
+            >
+              <ArrowLeft className="h-4 w-4 text-blue-600" />
+              Kembali ke Dashboard
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isBusy || !stats}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <Download className="h-4 w-4" />
+              Export XLSX
+            </button>
+          </div>
         </div>
 
         {showInitialLoader ? (
-          <div className="rounded-[32px] border border-slate-200 bg-white/90 px-6 py-10 text-center text-slate-600 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-slate-600 shadow-sm">
             Memuat statistik bulanan...
           </div>
         ) : stats ? (
           <div className="space-y-6">
-            <section className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-sm md:p-6">
-              <div className="max-w-2xl">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-blue-100 bg-blue-50/30 p-5">
+                <div className="max-w-2xl">
                 <p className="text-sm font-semibold uppercase tracking-[0.28em] text-blue-600">
                   Filter Statistik
                 </p>
@@ -205,9 +232,10 @@ export default function AdminStatistikPageClient({
                   Pilih bulan, tahun, dan status, lalu tampilkan data yang ingin
                   kamu lihat.
                 </p>
+                </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto_auto]">
+              <div className="grid grid-cols-1 gap-3 p-5 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto_auto]">
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -268,21 +296,22 @@ export default function AdminStatistikPageClient({
                   <RefreshCcw className="h-4 w-4 text-slate-500" />
                   Reset
                 </button>
+
               </div>
 
               {isRefreshingStats ? (
-                <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                <div className="mx-5 mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                   Memperbarui statistik...
                 </div>
               ) : null}
 
               {message ? (
-                <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <div className="mx-5 mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                   {message}
                 </div>
               ) : null}
 
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 p-5 pt-0 sm:flex-row">
                 <p className="flex items-center text-sm font-semibold text-slate-500">
                   Tampilan:
                 </p>
@@ -290,31 +319,27 @@ export default function AdminStatistikPageClient({
                   <button
                     type="button"
                     onClick={() => setActiveDisplay("TABLE")}
-                    className={`rounded-2xl border transition ${
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                       activeDisplay === "TABLE"
                         ? "border-blue-200 bg-blue-50 text-blue-700"
                         : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <div className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-inherit px-4 py-3 text-sm font-semibold">
-                      <Users className="h-4 w-4" />
-                      Rekap Pelapor
-                    </div>
+                    <Users className="h-4 w-4" />
+                    Rekap Pelapor
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setActiveDisplay("SUMMARY")}
-                    className={`rounded-2xl border transition ${
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                       activeDisplay === "SUMMARY"
                         ? "border-blue-200 bg-blue-50 text-blue-700"
                         : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <div className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-inherit px-4 py-3 text-sm font-semibold">
-                      <BarChart3 className="h-4 w-4" />
-                      Panel Ringkasan
-                    </div>
+                    <BarChart3 className="h-4 w-4" />
+                    Panel Ringkasan
                   </button>
                 </div>
               </div>
@@ -349,7 +374,7 @@ export default function AdminStatistikPageClient({
             </section>
           </div>
         ) : (
-          <div className="rounded-[32px] border border-slate-200 bg-white/90 px-6 py-10 text-center text-slate-600 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-slate-600 shadow-sm">
             Data statistik tidak tersedia.
           </div>
         )}

@@ -10,21 +10,33 @@ import {
   listUsersWithReportCountRaw,
 } from "@/src/lib/raw-data";
 import { validateMutationRequest } from "@/src/lib/request-security";
-import type { AppRole } from "@/src/lib/roles";
+import type { AppCategoryScope, AppRole } from "@/src/lib/roles";
+import { isCategoryScopedRole } from "@/src/lib/roles";
 
 const VALID_ROLES: AppRole[] = [
-  "SUPER_ADMIN",
   "ADMIN_1",
   "ADMIN_2",
   "ADMIN_3",
   "ADMIN_4",
   "ADMIN_5",
-  "ADMIN_6",
   "USER",
+];
+
+const VALID_CATEGORY_SCOPES: AppCategoryScope[] = [
+  "FASILITAS_INVENTARIS",
+  "IT_ELEKTRONIK",
+  "LABORATORIUM",
 ];
 
 function isValidRole(role: unknown): role is AppRole {
   return typeof role === "string" && VALID_ROLES.includes(role as AppRole);
+}
+
+function isValidCategoryScope(value: unknown): value is AppCategoryScope {
+  return (
+    typeof value === "string" &&
+    VALID_CATEGORY_SCOPES.includes(value as AppCategoryScope)
+  );
 }
 
 async function requireSuperAdmin() {
@@ -36,7 +48,7 @@ async function requireSuperAdmin() {
     };
   }
 
-  if (authUser.role !== "SUPER_ADMIN") {
+  if (!authUser.isSuperAdmin) {
     return {
       error: NextResponse.json(
         { message: "Hanya Super Admin yang boleh mengelola user." },
@@ -48,7 +60,17 @@ async function requireSuperAdmin() {
   return { authUser };
 }
 
-export async function GET() {
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+export async function GET(req: Request) {
   try {
     const access = await requireSuperAdmin();
 
@@ -56,9 +78,17 @@ export async function GET() {
       return access.error;
     }
 
-    const users = await listUsersWithReportCountRaw();
+    const url = new URL(req.url);
+    const search = url.searchParams.get("q") || "";
+    const limit = parsePositiveInt(url.searchParams.get("limit"), 12);
+    const offset = parsePositiveInt(url.searchParams.get("offset"), 0);
+    const result = await listUsersWithReportCountRaw({
+      search,
+      take: limit,
+      skip: offset,
+    });
 
-    return NextResponse.json({ users });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("GET_ADMIN_USERS_ERROR:", error);
 
@@ -91,6 +121,10 @@ export async function POST(req: Request) {
     const nip = typeof body.nip === "string" ? body.nip.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
     const role = isValidRole(body.role) ? body.role : "USER";
+    const isSuperAdmin = body.isSuperAdmin === true;
+    const categoryScope = isValidCategoryScope(body.categoryScope)
+      ? body.categoryScope
+      : null;
 
     if (!nama || !nip || !password) {
       return NextResponse.json(
@@ -101,7 +135,14 @@ export async function POST(req: Request) {
 
     if (nip.length > 50 || nama.length > 120 || jabatan.length > 120) {
       return NextResponse.json(
-        { message: "NIP, nama, atau jabatan terlalu panjang." },
+        { message: "NIP atau nama terlalu panjang." },
+        { status: 400 }
+      );
+    }
+
+    if (isCategoryScopedRole(role) && !categoryScope) {
+      return NextResponse.json(
+        { message: "Kategori wajib dipilih untuk PJ Perbaikan dan PPK." },
         { status: 400 }
       );
     }
@@ -133,6 +174,8 @@ export async function POST(req: Request) {
         nip,
         passwordHash,
         role,
+        isSuperAdmin,
+        categoryScope: isCategoryScopedRole(role) ? categoryScope : null,
       },
       select: {
         id: true,
@@ -140,6 +183,8 @@ export async function POST(req: Request) {
         jabatan: true,
         nip: true,
         role: true,
+        isSuperAdmin: true,
+        categoryScope: true,
         createdAt: true,
         updatedAt: true,
       },

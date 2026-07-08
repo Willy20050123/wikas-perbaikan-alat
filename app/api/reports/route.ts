@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
 import {
-  parseReportFormData,
-  validateReportInput,
+  parseModalReportFormData,
   type ValidKategori,
-  type ValidSeverity,
+  validateModalReportInput,
 } from "@/src/lib/report-validation";
-import { saveImageUpload, validateImageUpload } from "@/src/lib/uploads";
+import {
+  saveReportAttachmentUpload,
+  validateReportAttachmentUpload,
+} from "@/src/lib/uploads";
 import { listReportsRaw } from "@/src/lib/raw-data";
 import { validateMutationRequest } from "@/src/lib/request-security";
-import { isAdminRole } from "@/src/lib/roles";
+import { getRoleLabel, hasAdminAccess } from "@/src/lib/roles";
 
 export async function POST(req: Request) {
   try {
@@ -34,16 +36,16 @@ export async function POST(req: Request) {
     }
 
     const formData = await req.formData();
-    const reportInput = parseReportFormData(formData);
-    const file = formData.get("foto") as File | null;
+    const reportInput = parseModalReportFormData(formData);
+    const file = formData.get("attachment") as File | null;
 
-    const validationError = validateReportInput(reportInput);
+    const validationError = validateModalReportInput(reportInput);
 
     if (validationError) {
       return NextResponse.json({ message: validationError }, { status: 400 });
     }
 
-    const fileValidationError = validateImageUpload(file);
+    const fileValidationError = validateReportAttachmentUpload(file);
 
     if (fileValidationError) {
       return NextResponse.json(
@@ -52,21 +54,28 @@ export async function POST(req: Request) {
       );
     }
 
-    let fotoUrl: string | null = null;
+    let attachmentUrl: string | null = null;
 
     if (file && file.size > 0) {
-      fotoUrl = await saveImageUpload(file);
+      attachmentUrl = await saveReportAttachmentUpload(file);
     }
 
     const report = await prisma.report.create({
       data: {
         userId: authUser.id,
+        namaPelapor: reportInput.namaPelapor,
+        nomorRuangan: reportInput.nomorRuangan,
+        kodeUakpb: reportInput.kodeUakpb,
+        kode: reportInput.kode,
         kategori: reportInput.kategori as ValidKategori,
-        namaBarang: reportInput.namaBarang,
-        lokasi: reportInput.lokasi,
+        namaBarang: "Perbaikan Alat",
+        lokasi: `Ruangan ${reportInput.nomorRuangan}`,
         deskripsi: reportInput.deskripsi,
-        severity: reportInput.severity as ValidSeverity,
-        fotoUrl,
+        severity: "SEDANG",
+        fotoUrl: file?.type.startsWith("image/") ? attachmentUrl : null,
+        attachmentUrl,
+        attachmentType: file && file.size > 0 ? file.type : null,
+        attachmentName: file && file.size > 0 ? file.name : null,
         status: "MENUNGGU_ADMIN_1",
       },
       include: {
@@ -98,7 +107,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
-      message: "Laporan berhasil dikirim dan menunggu persetujuan Admin 1.",
+      message: `Laporan berhasil dikirim dan menunggu persetujuan ${getRoleLabel("ADMIN_1")}.`,
       report,
     });
   } catch (error) {
@@ -120,7 +129,7 @@ export async function GET() {
     }
 
     const reports = await listReportsRaw(
-      isAdminRole(authUser.role) ? undefined : authUser.id
+      hasAdminAccess(authUser) ? undefined : authUser.id
     );
 
     return NextResponse.json({ reports });

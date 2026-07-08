@@ -717,6 +717,8 @@ export const UserScalarFieldEnum = {
   nip: 'nip',
   passwordHash: 'passwordHash',
   role: 'role',
+  isSuperAdmin: 'isSuperAdmin',
+  categoryScope: 'categoryScope',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -727,12 +729,19 @@ export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof User
 export const ReportScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  namaPelapor: 'namaPelapor',
+  nomorRuangan: 'nomorRuangan',
+  kodeUakpb: 'kodeUakpb',
+  kode: 'kode',
   kategori: 'kategori',
   namaBarang: 'namaBarang',
   lokasi: 'lokasi',
   deskripsi: 'deskripsi',
   severity: 'severity',
   fotoUrl: 'fotoUrl',
+  attachmentUrl: 'attachmentUrl',
+  attachmentType: 'attachmentType',
+  attachmentName: 'attachmentName',
   status: 'status',
   alasanPenolakan: 'alasanPenolakan',
   assignedTechnician: 'assignedTechnician',
@@ -803,10 +812,17 @@ export type UserOrderByRelevanceFieldEnum = (typeof UserOrderByRelevanceFieldEnu
 
 
 export const ReportOrderByRelevanceFieldEnum = {
+  namaPelapor: 'namaPelapor',
+  nomorRuangan: 'nomorRuangan',
+  kodeUakpb: 'kodeUakpb',
+  kode: 'kode',
   namaBarang: 'namaBarang',
   lokasi: 'lokasi',
   deskripsi: 'deskripsi',
   fotoUrl: 'fotoUrl',
+  attachmentUrl: 'attachmentUrl',
+  attachmentType: 'attachmentType',
+  attachmentName: 'attachmentName',
   alasanPenolakan: 'alasanPenolakan',
   assignedTechnician: 'assignedTechnician',
   adminNotes: 'adminNotes',
@@ -859,9 +875,9 @@ export type EnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
 
 
 /**
- * Reference to a field of type 'DateTime'
+ * Reference to a field of type 'Boolean'
  */
-export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 
@@ -869,6 +885,13 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'ReportCategory'
  */
 export type EnumReportCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ReportCategory'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime'
+ */
+export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
     
 
 

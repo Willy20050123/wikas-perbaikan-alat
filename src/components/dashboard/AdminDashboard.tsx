@@ -6,23 +6,24 @@ import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CalendarDays,
+  FileText,
   History,
   KeyRound,
   LogOut,
   UserCog,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   formatKategori,
   formatTanggal,
-  formatSeverity,
   formatStatus,
   getStatusClass,
   type ReportKategori,
-  type ReportSeverity,
   type ReportStatus,
 } from "@/lib/report-helpers";
-import type { AppRole } from "@/src/lib/roles";
+import type { AppCategoryScope, AppRole } from "@/src/lib/roles";
+import { getCategoryScopeLabel, getRoleLabel } from "@/src/lib/roles";
 import { canRoleDecide, getWorkflowMessage } from "@/src/lib/workflow";
 
 type AdminDashboardProps = {
@@ -32,9 +33,20 @@ type AdminDashboardProps = {
     jabatan: string | null;
     nip: string | null;
     role: AppRole;
+    isSuperAdmin: boolean;
+    categoryScope: AppCategoryScope | null;
   };
   title?: string;
 };
+
+const REPORT_PAGE_SIZE = 50;
+const MAX_COMPLETION_PROOF_SIZE = 2 * 1024 * 1024;
+const ALLOWED_COMPLETION_PROOF_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 type ReportHistoryItem = {
   id: number;
@@ -49,17 +61,24 @@ type ReportHistoryItem = {
     jabatan: string | null;
     nip: string | null;
     role: AppRole;
+    categoryScope: AppCategoryScope | null;
   };
 };
 
 type ReportItem = {
   id: number;
+  namaPelapor?: string | null;
+  nomorRuangan?: string | null;
+  kodeUakpb?: string | null;
+  kode?: string | null;
   kategori: ReportKategori;
   namaBarang: string;
   lokasi: string;
   deskripsi: string;
-  severity: ReportSeverity;
   fotoUrl: string | null;
+  attachmentUrl?: string | null;
+  attachmentType?: string | null;
+  attachmentName?: string | null;
   completionPhotoUrl?: string | null;
   status: ReportStatus;
   alasanPenolakan: string | null;
@@ -93,6 +112,20 @@ function isWaitingStatus(status: ReportStatus) {
   return status.startsWith("MENUNGGU_ADMIN");
 }
 
+function getRejectingAdmin(report: ReportItem) {
+  return [...(report.histories || [])]
+    .reverse()
+    .find((history) => history.action === "TOLAK")?.admin;
+}
+
+function isFinalApprovalStep(report: ReportItem | null) {
+  return report?.status === "MENUNGGU_ADMIN_5";
+}
+
+function isPdfUrl(url: string) {
+  return url.toLowerCase().split("?")[0].endsWith(".pdf");
+}
+
 export default function AdminDashboard({
   currentUser,
   title = "Dashboard Laporan Kerusakan Barang & Alat",
@@ -103,8 +136,10 @@ export default function AdminDashboard({
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
+  const [completionProof, setCompletionProof] = useState<File | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [visibleReportLimit, setVisibleReportLimit] = useState(REPORT_PAGE_SIZE);
 
   async function loadReports() {
     try {
@@ -118,6 +153,7 @@ export default function AdminDashboard({
       }
 
       setReports(data.reports || []);
+      setVisibleReportLimit(REPORT_PAGE_SIZE);
     } catch (error) {
       console.error("LOAD_ADMIN_REPORTS_ERROR:", error);
       setMessage("Terjadi kesalahan saat memuat laporan.");
@@ -145,12 +181,14 @@ export default function AdminDashboard({
   function openReportDetail(report: ReportItem) {
     setSelectedReport(report);
     setDecisionNote(report.adminNotes || report.alasanPenolakan || "");
+    setCompletionProof(null);
     setMessage("");
   }
 
   function closeReportDetail() {
     setSelectedReport(null);
     setDecisionNote("");
+    setCompletionProof(null);
   }
 
   async function submitDecision(action: "ACC" | "TOLAK") {
@@ -161,18 +199,61 @@ export default function AdminDashboard({
       return;
     }
 
+    const needsCompletionProof = action === "ACC" && isFinalApprovalStep(selectedReport);
+
+    if (needsCompletionProof && !completionProof) {
+      const errorMessage =
+        'Silakan isi "bukti penyelesaian" sebelum menyelesaikan laporan.';
+      setMessage(errorMessage);
+      toast.error("Bukti penyelesaian wajib diisi", {
+        description: errorMessage,
+      });
+      return;
+    }
+
+    if (
+      needsCompletionProof &&
+      completionProof &&
+      !ALLOWED_COMPLETION_PROOF_TYPES.has(completionProof.type)
+    ) {
+      setMessage("Bukti penyelesaian harus berupa JPG, PNG, WEBP, atau PDF.");
+      return;
+    }
+
+    if (
+      needsCompletionProof &&
+      completionProof &&
+      completionProof.size > MAX_COMPLETION_PROOF_SIZE
+    ) {
+      setMessage("Bukti penyelesaian maksimal 2MB.");
+      return;
+    }
+
     try {
       setSubmitLoading(true);
 
-      const res = await fetch(`/api/reports/${selectedReport.id}/decide`, {
+      const requestInit: RequestInit = {
         method: "POST",
-        headers: {
+      };
+
+      if (needsCompletionProof) {
+        const formData = new FormData();
+        formData.set("action", action);
+        formData.set("note", decisionNote);
+        formData.set("proof", completionProof!);
+        requestInit.body = formData;
+      } else {
+        requestInit.headers = {
           "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        };
+        requestInit.body = JSON.stringify({
           action,
           note: decisionNote,
-        }),
+        });
+      }
+
+      const res = await fetch(`/api/reports/${selectedReport.id}/decide`, {
+        ...requestInit,
       });
 
       const data = await res.json();
@@ -199,22 +280,28 @@ export default function AdminDashboard({
       menunggu: reports.filter((report) => isWaitingStatus(report.status)).length,
       final: reports.filter((report) => report.status === "DISETUJUI_FINAL").length,
       ditolak: reports.filter((report) => report.status === "DITOLAK").length,
-      giliranSaya: reports.filter((report) =>
-        canRoleDecide(currentUser.role, report.status),
-      ).length,
     }),
-    [reports, currentUser.role],
+    [reports],
   );
 
+  const selectedReportRejectingAdmin = selectedReport
+    ? getRejectingAdmin(selectedReport)
+    : null;
+  const visibleReports = useMemo(
+    () => reports.slice(0, visibleReportLimit),
+    [reports, visibleReportLimit],
+  );
+  const hiddenReportCount = Math.max(reports.length - visibleReports.length, 0);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 px-4 py-8 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 px-8 py-8 text-slate-900 sm:px-12 lg:px-20 xl:px-24">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-blue-600">
               Admin Panel
             </p>
-            <h1 className="mt-2 text-3xl font-bold text-slate-950 md:text-5xl">
+            <h1 className="mt-2 text-3xl font-bold text-slate-950 md:text-4xl">
               {title}
             </h1>
             <p className="mt-3 max-w-3xl text-slate-600">
@@ -223,11 +310,11 @@ export default function AdminDashboard({
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
             <button
               type="button"
               onClick={() => router.push("/dashboard/admin/history")}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
             >
               <History className="h-4 w-4 text-blue-600" />
               Riwayat
@@ -236,17 +323,17 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => router.push("/dashboard/admin/statistik")}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
             >
               <BarChart3 className="h-4 w-4 text-blue-600" />
               Statistik
             </button>
 
-            {currentUser.role === "SUPER_ADMIN" ? (
+            {currentUser.isSuperAdmin ? (
               <button
                 type="button"
                 onClick={() => router.push("/dashboard/admin/users")}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
               >
                 <UserCog className="h-4 w-4 text-blue-600" />
                 Kelola User
@@ -256,7 +343,7 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => router.push("/dashboard/account")}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
             >
               <KeyRound className="h-4 w-4 text-blue-600" />
               Akun
@@ -265,7 +352,7 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => void handleLogout()}
-              className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-3 font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-3 font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -273,52 +360,70 @@ export default function AdminDashboard({
           </div>
         </header>
 
-        <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-          <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-sm xl:col-span-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Admin Aktif
-            </p>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 font-semibold text-blue-700">
-                {getInitials(currentUser.nama) || "AD"}
+        <section className="mb-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-blue-50/40 px-5 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-white text-sm font-semibold text-blue-700">
+                  {getInitials(currentUser.nama) || "AD"}
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900">
+                    {currentUser.nama}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {getRoleLabel(currentUser.role)} - NIP:{" "}
+                    {currentUser.nip || "-"}
+                  </p>
+                  {currentUser.categoryScope ? (
+                    <p className="mt-1 text-xs font-medium text-blue-600">
+                      Kategori: {getCategoryScopeLabel(currentUser.categoryScope)}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-slate-900">{currentUser.nama}</p>
-                <p className="text-sm text-slate-500">
-                  {currentUser.jabatan || "Admin Sistem"}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {currentUser.role} • NIP: {currentUser.nip || "-"}
-                </p>
-              </div>
+
             </div>
           </div>
 
-          {[
-            ["Total", summary.total, "Semua laporan.", "text-blue-600"],
-            ["Menunggu", summary.menunggu, "Masih dalam approval.", "text-amber-600"],
-            [
-              "Giliran Saya",
-              summary.giliranSaya,
-              "Butuh keputusan Anda.",
-              "text-emerald-600",
-            ],
-            ["Final", summary.final, "Disetujui semua admin.", "text-purple-600"],
-            ["Ditolak", summary.ditolak, "Alur berhenti permanen.", "text-rose-600"],
-          ].map(([label, value, description, numberColor]) => (
-            <div
-              key={String(label)}
-              className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-sm"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-                {label}
-              </p>
-              <p className={`mt-3 text-5xl font-extrabold ${numberColor}`}>
-                {value}
-              </p>
-              <p className="mt-3 text-sm text-slate-500">{description}</p>
-            </div>
-          ))}
+          <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 lg:grid-cols-4 lg:divide-y-0">
+            {[
+              {
+                label: "Total",
+                value: summary.total,
+                valueClass: "text-blue-700",
+                dotClass: "bg-blue-500",
+              },
+              {
+                label: "Menunggu",
+                value: summary.menunggu,
+                valueClass: "text-amber-700",
+                dotClass: "bg-amber-500",
+              },
+              {
+                label: "Final",
+                value: summary.final,
+                valueClass: "text-indigo-700",
+                dotClass: "bg-indigo-500",
+              },
+              {
+                label: "Ditolak",
+                value: summary.ditolak,
+                valueClass: "text-rose-700",
+                dotClass: "bg-rose-500",
+              },
+            ].map((item) => (
+              <div key={item.label} className="px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${item.dotClass}`} />
+                  <p className="text-sm text-slate-500">{item.label}</p>
+                </div>
+                <p className={`mt-1 text-2xl font-semibold ${item.valueClass}`}>
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
 
         {message ? (
@@ -327,8 +432,8 @@ export default function AdminDashboard({
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white/90 shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-5">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-blue-100 bg-blue-50/30 px-6 py-5">
             <h2 className="text-2xl font-bold text-slate-900">Laporan Masuk</h2>
           </div>
 
@@ -342,7 +447,7 @@ export default function AdminDashboard({
             <div className="overflow-x-auto">
               <table className="min-w-full text-left">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500">
+                  <tr className="border-b border-blue-100 bg-blue-50/40 text-slate-600">
                     <th className="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.24em]">
                       ID
                     </th>
@@ -359,9 +464,6 @@ export default function AdminDashboard({
                       Status
                     </th>
                     <th className="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.24em]">
-                      Giliran
-                    </th>
-                    <th className="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.24em]">
                       Tanggal
                     </th>
                     <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.24em]">
@@ -371,13 +473,7 @@ export default function AdminDashboard({
                 </thead>
 
                 <tbody>
-                  {reports.map((report) => {
-                    const canDecide = canRoleDecide(
-                      currentUser.role,
-                      report.status,
-                    );
-
-                    return (
+                  {visibleReports.map((report) => (
                       <tr
                         key={report.id}
                         className="border-b border-slate-100 transition hover:bg-blue-50/50"
@@ -415,16 +511,6 @@ export default function AdminDashboard({
                           </span>
                         </td>
 
-                        <td className="px-6 py-5">
-                          {canDecide ? (
-                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                              Giliran Anda
-                            </span>
-                          ) : (
-                            <span className="text-sm text-slate-400">-</span>
-                          )}
-                        </td>
-
                         <td className="px-6 py-5 text-slate-700">
                           <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                             <CalendarDays className="h-4 w-4 text-slate-400" />
@@ -442,10 +528,25 @@ export default function AdminDashboard({
                           </button>
                         </td>
                       </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
+              {hiddenReportCount > 0 ? (
+                <div className="border-t border-slate-100 bg-white p-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleReportLimit(
+                        (current) => current + REPORT_PAGE_SIZE,
+                      )
+                    }
+                    className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                  >
+                    Tampilkan {Math.min(REPORT_PAGE_SIZE, hiddenReportCount)}{" "}
+                    laporan lagi
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </section>
@@ -465,7 +566,12 @@ export default function AdminDashboard({
                     Detail Laporan
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    {getWorkflowMessage(currentUser.role, selectedReport.status)}
+                    {getWorkflowMessage(
+                      currentUser.role,
+                      selectedReport.status,
+                      selectedReport.kategori,
+                      currentUser.categoryScope,
+                    )}
                   </p>
                 </div>
 
@@ -480,7 +586,7 @@ export default function AdminDashboard({
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.9fr]">
                 <div className="space-y-6">
-                  <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-bold tracking-wide text-blue-700">
                         LP-{String(selectedReport.id).padStart(4, "0")}
@@ -502,8 +608,8 @@ export default function AdminDashboard({
                     <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                       <InfoBox label="Pelapor">
                         <p className="mt-1 font-semibold text-slate-900">
-                          {selectedReport.user.nama}
-                        </p>
+                        {selectedReport.user.nama}
+                      </p>
                         <p className="mt-1 text-sm text-slate-500">
                           NIP: {selectedReport.user.nip || "-"}
                         </p>
@@ -513,8 +619,20 @@ export default function AdminDashboard({
                         {formatKategori(selectedReport.kategori)}
                       </InfoBox>
 
-                      <InfoBox label="Severity">
-                        {formatSeverity(selectedReport.severity)}
+                      <InfoBox label="Nama Pelapor">
+                        {selectedReport.namaPelapor || selectedReport.user.nama}
+                      </InfoBox>
+
+                      <InfoBox label="Kode Ruangan">
+                        {selectedReport.nomorRuangan || selectedReport.lokasi}
+                      </InfoBox>
+
+                      <InfoBox label="Kode UAKPB">
+                        {selectedReport.kodeUakpb || "-"}
+                      </InfoBox>
+
+                      <InfoBox label="Kode">
+                        {selectedReport.kode || "-"}
                       </InfoBox>
 
                       <InfoBox label="Lokasi">
@@ -544,6 +662,12 @@ export default function AdminDashboard({
                         <p className="text-sm font-semibold text-rose-700">
                           Alasan Penolakan
                         </p>
+                        {selectedReportRejectingAdmin ? (
+                          <p className="mt-2 text-sm font-semibold text-rose-800">
+                            Ditolak oleh {selectedReportRejectingAdmin.nama}{" "}
+                            ({getRoleLabel(selectedReportRejectingAdmin.role)})
+                          </p>
+                        ) : null}
                         <p className="mt-2 text-rose-700">
                           {selectedReport.alasanPenolakan}
                         </p>
@@ -573,11 +697,12 @@ export default function AdminDashboard({
                               className="rounded-2xl border border-slate-200 bg-white p-3 text-sm shadow-sm"
                             >
                               <p className="font-semibold text-slate-900">
-                                {history.admin.nama} ({history.admin.role}) •{" "}
+                                {history.admin.nama}{" "}
+                                ({getRoleLabel(history.admin.role)}) -{" "}
                                 {history.action}
                               </p>
                               <p className="mt-1 text-slate-500">
-                                {formatStatus(history.fromStatus)} →{" "}
+                                {formatStatus(history.fromStatus)} -{" "}
                                 {formatStatus(history.toStatus)}
                               </p>
                               {history.note ? (
@@ -597,35 +722,92 @@ export default function AdminDashboard({
                 </div>
 
                 <div className="space-y-6">
-                  <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="mb-3 text-sm text-slate-500">Foto Barang</p>
-                    {selectedReport.fotoUrl ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="mb-3 text-sm text-slate-500">Lampiran</p>
+                    {(selectedReport.attachmentUrl || selectedReport.fotoUrl) &&
+                    (selectedReport.attachmentType?.startsWith("image/") ||
+                      selectedReport.fotoUrl) ? (
                       <div className="overflow-hidden rounded-2xl border border-slate-200">
                         <Image
-                          src={selectedReport.fotoUrl}
+                          src={selectedReport.attachmentUrl || selectedReport.fotoUrl || ""}
                           alt={selectedReport.namaBarang}
                           width={1200}
                           height={800}
                           className="w-full object-cover"
-                          preload
+                          unoptimized
                         />
                       </div>
+                    ) : selectedReport.attachmentUrl ? (
+                      <a
+                        href={selectedReport.attachmentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <FileText className="mb-3 h-8 w-8" />
+                        <span className="font-semibold">Buka Lampiran PDF</span>
+                        <span className="mt-1 max-w-full truncate text-xs">
+                          {selectedReport.attachmentName || "Dokumen laporan"}
+                        </span>
+                      </a>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-500">
-                        Tidak ada foto awal
+                        Tidak ada lampiran
                       </div>
                     )}
                   </div>
 
-                  <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+                  {selectedReport.completionPhotoUrl ? (
+                    <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                      <p className="mb-3 text-sm text-slate-500">
+                        Bukti Penyelesaian
+                      </p>
+                      {isPdfUrl(selectedReport.completionPhotoUrl) ? (
+                        <a
+                          href={selectedReport.completionPhotoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex min-h-32 flex-col items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          <FileText className="mb-3 h-8 w-8" />
+                          <span className="font-semibold">
+                            Buka Bukti PDF
+                          </span>
+                        </a>
+                      ) : (
+                        <div className="overflow-hidden rounded-2xl border border-emerald-100">
+                          <Image
+                            src={selectedReport.completionPhotoUrl}
+                            alt="Bukti penyelesaian"
+                            width={1200}
+                            height={800}
+                            className="w-full object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <p className="text-sm text-slate-500">Keputusan Admin</p>
 
                     <div className="mt-4 space-y-4">
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                        {getWorkflowMessage(currentUser.role, selectedReport.status)}
+                        {getWorkflowMessage(
+                          currentUser.role,
+                          selectedReport.status,
+                          selectedReport.kategori,
+                          currentUser.categoryScope,
+                        )}
                       </div>
 
-                      {canRoleDecide(currentUser.role, selectedReport.status) ? (
+                      {canRoleDecide(
+                        currentUser.role,
+                        selectedReport.status,
+                        selectedReport.kategori,
+                        currentUser.categoryScope,
+                      ) ? (
                         <>
                           <textarea
                             value={decisionNote}
@@ -635,6 +817,37 @@ export default function AdminDashboard({
                             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                           />
 
+                          {isFinalApprovalStep(selectedReport) ? (
+                            <label className="block rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+                              <span className="block font-semibold text-slate-900">
+                                Bukti penyelesaian
+                                <span
+                                  aria-hidden="true"
+                                  className="ml-1 font-bold text-rose-500"
+                                >
+                                  *
+                                </span>
+                              </span>
+                              <span className="mt-1 block text-xs text-slate-500">
+                                Wajib untuk PP sebelum klik Selesai. Format JPG,
+                                PNG, WEBP, atau PDF. Maksimal 2MB.
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf"
+                                onChange={(event) =>
+                                  setCompletionProof(event.target.files?.[0] || null)
+                                }
+                                className="mt-3 block w-full text-sm text-slate-700 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-slate-600"
+                              />
+                              {completionProof ? (
+                                <span className="mt-2 block text-xs font-medium text-slate-700">
+                                  Dipilih: {completionProof.name}
+                                </span>
+                              ) : null}
+                            </label>
+                          ) : null}
+
                           <div className="flex flex-wrap gap-3">
                             <button
                               type="button"
@@ -642,7 +855,11 @@ export default function AdminDashboard({
                               disabled={submitLoading}
                               className="rounded-2xl bg-emerald-500 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:opacity-60"
                             >
-                              {submitLoading ? "Memproses..." : "ACC"}
+                              {submitLoading
+                                ? "Memproses..."
+                                : isFinalApprovalStep(selectedReport)
+                                  ? "Selesai"
+                                  : "ACC"}
                             </button>
 
                             <button

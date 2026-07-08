@@ -2,18 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
 import {
-  parseReportFormData,
-  validateReportInput,
+  parseModalReportFormData,
   type ValidKategori,
-  type ValidSeverity,
+  validateModalReportInput,
 } from "@/src/lib/report-validation";
 import {
   deleteUploadedFileByUrl,
-  saveImageUpload,
-  validateImageUpload,
+  saveReportAttachmentUpload,
+  validateReportAttachmentUpload,
 } from "@/src/lib/uploads";
 import { validateMutationRequest } from "@/src/lib/request-security";
-import { isAdminRole } from "@/src/lib/roles";
+import { getRoleLabel, hasAdminAccess } from "@/src/lib/roles";
+import { canAdminAccessReport } from "@/src/lib/workflow";
 
 function parseReportId(id: string) {
   const reportId = Number(id);
@@ -85,7 +85,19 @@ export async function GET(
       );
     }
 
-    if (!isAdminRole(authUser.role) && report.userId !== authUser.id) {
+    if (
+      hasAdminAccess(authUser) &&
+      !canAdminAccessReport({
+        role: authUser.role,
+        isSuperAdmin: authUser.isSuperAdmin,
+        categoryScope: authUser.categoryScope,
+        reportCategory: report.kategori,
+      })
+    ) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
+
+    if (!hasAdminAccess(authUser) && report.userId !== authUser.id) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
@@ -150,25 +162,23 @@ export async function PATCH(
       return NextResponse.json(
         {
           message:
-            "Laporan hanya bisa diubah saat masih menunggu persetujuan Admin 1.",
+            `Laporan hanya bisa diubah saat masih menunggu persetujuan ${getRoleLabel("ADMIN_1")}.`,
         },
         { status: 400 }
       );
     }
 
     const formData = await req.formData();
-    const reportInput = parseReportFormData(formData);
-    const file = formData.get("foto") as File | null;
-    const removeExistingPhoto =
-      String(formData.get("removeFoto") || "") === "true";
+    const reportInput = parseModalReportFormData(formData);
+    const file = formData.get("attachment") as File | null;
 
-    const validationError = validateReportInput(reportInput);
+    const validationError = validateModalReportInput(reportInput);
 
     if (validationError) {
       return NextResponse.json({ message: validationError }, { status: 400 });
     }
 
-    const fileValidationError = validateImageUpload(file);
+    const fileValidationError = validateReportAttachmentUpload(file);
 
     if (fileValidationError) {
       return NextResponse.json(
@@ -177,32 +187,42 @@ export async function PATCH(
       );
     }
 
+    let attachmentUrl = existingReport.attachmentUrl;
+    let attachmentType = existingReport.attachmentType;
+    let attachmentName = existingReport.attachmentName;
     let fotoUrl = existingReport.fotoUrl;
 
-    if (removeExistingPhoto) {
-      await deleteUploadedFileByUrl(existingReport.fotoUrl);
-      fotoUrl = null;
-    }
-
     if (file && file.size > 0) {
-      const newPhotoUrl = await saveImageUpload(file);
+      const newAttachmentUrl = await saveReportAttachmentUpload(file);
 
-      if (existingReport.fotoUrl) {
+      if (existingReport.attachmentUrl) {
+        await deleteUploadedFileByUrl(existingReport.attachmentUrl);
+      } else if (existingReport.fotoUrl) {
         await deleteUploadedFileByUrl(existingReport.fotoUrl);
       }
 
-      fotoUrl = newPhotoUrl;
+      attachmentUrl = newAttachmentUrl;
+      attachmentType = file.type;
+      attachmentName = file.name;
+      fotoUrl = file.type.startsWith("image/") ? newAttachmentUrl : null;
     }
 
     const updatedReport = await prisma.report.update({
       where: { id: reportId },
       data: {
+        namaPelapor: reportInput.namaPelapor,
+        nomorRuangan: reportInput.nomorRuangan,
+        kodeUakpb: reportInput.kodeUakpb,
+        kode: reportInput.kode,
         kategori: reportInput.kategori as ValidKategori,
-        namaBarang: reportInput.namaBarang,
-        lokasi: reportInput.lokasi,
+        namaBarang: "Perbaikan Alat",
+        lokasi: `Ruangan ${reportInput.nomorRuangan}`,
         deskripsi: reportInput.deskripsi,
-        severity: reportInput.severity as ValidSeverity,
+        severity: "SEDANG",
         fotoUrl,
+        attachmentUrl,
+        attachmentType,
+        attachmentName,
       },
       include: reportInclude,
     });
@@ -259,6 +279,7 @@ export async function DELETE(
         userId: true,
         status: true,
         fotoUrl: true,
+        attachmentUrl: true,
       },
     });
 
@@ -277,7 +298,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           message:
-            "Laporan hanya bisa dihapus saat masih menunggu persetujuan Admin 1.",
+            `Laporan hanya bisa dihapus saat masih menunggu persetujuan ${getRoleLabel("ADMIN_1")}.`,
         },
         { status: 400 }
       );
@@ -287,7 +308,9 @@ export async function DELETE(
       where: { id: reportId },
     });
 
-    await deleteUploadedFileByUrl(existingReport.fotoUrl);
+    await deleteUploadedFileByUrl(
+      existingReport.attachmentUrl || existingReport.fotoUrl
+    );
 
     return NextResponse.json({
       message: "Laporan berhasil dihapus.",

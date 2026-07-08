@@ -2,22 +2,30 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getApiSessionUser } from "@/src/lib/session";
 import { findReportByIdRaw } from "@/src/lib/raw-data";
-import { isAdminRole } from "@/src/lib/roles";
+import { getRoleLabel, hasAdminAccess } from "@/src/lib/roles";
 import {
   canRoleDecide,
   getNextApprovedStatus,
   getRejectedStatus,
   getRequiredAdminRole,
+  getWorkflowMessage,
   type ReportDecisionInput,
 } from "@/src/lib/workflow";
 import {
   enforceJsonBodySize,
+  enforceMultipartBodySize,
   requireSameOrigin,
 } from "@/src/lib/request-security";
+import {
+  deleteUploadedFileByUrl,
+  saveReportAttachmentUpload,
+  validateReportAttachmentUpload,
+} from "@/src/lib/uploads";
 
 type DecisionPayload = {
   action: ReportDecisionInput;
   note: string;
+  proofFile: File | null;
 };
 
 function parseReportId(id: string) {
@@ -48,6 +56,24 @@ function normalizeAction(action: unknown): ReportDecisionInput | null {
 async function parseDecisionPayload(req: Request): Promise<DecisionPayload | null> {
   const contentType = req.headers.get("content-type") || "";
 
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await req.formData();
+    const action = normalizeAction(formData.get("action"));
+
+    if (!action) {
+      return null;
+    }
+
+    const noteValue = formData.get("note") || formData.get("adminNotes");
+    const proofValue = formData.get("proof");
+
+    return {
+      action,
+      note: typeof noteValue === "string" ? noteValue.trim() : "",
+      proofFile: proofValue instanceof File ? proofValue : null,
+    };
+  }
+
   if (!contentType.includes("application/json")) {
     return null;
   }
@@ -71,6 +97,7 @@ async function parseDecisionPayload(req: Request): Promise<DecisionPayload | nul
   return {
     action,
     note,
+    proofFile: null,
   };
 }
 
@@ -85,7 +112,10 @@ export async function POST(
       return originError;
     }
 
-    const sizeError = enforceJsonBodySize(req);
+    const contentType = req.headers.get("content-type") || "";
+    const sizeError = contentType.includes("multipart/form-data")
+      ? enforceMultipartBodySize(req)
+      : enforceJsonBodySize(req);
 
     if (sizeError) {
       return sizeError;
@@ -97,7 +127,7 @@ export async function POST(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    if (!isAdminRole(authUser.role)) {
+    if (!hasAdminAccess(authUser)) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
@@ -169,10 +199,25 @@ export async function POST(
       );
     }
 
-    if (!canRoleDecide(authUser.role, report.status)) {
+    if (
+      !canRoleDecide(
+        authUser.role,
+        report.status,
+        report.kategori,
+        authUser.categoryScope,
+      )
+    ) {
       return NextResponse.json(
         {
-          message: `Belum giliran Anda. Laporan ini sedang menunggu ${requiredRole}.`,
+          message:
+            authUser.role === requiredRole
+              ? getWorkflowMessage(
+                  authUser.role,
+                  report.status,
+                  report.kategori,
+                  authUser.categoryScope,
+                )
+              : `Belum giliran Anda. Laporan ini sedang menunggu ${getRoleLabel(requiredRole)}.`,
         },
         { status: 403 }
       );
@@ -185,51 +230,89 @@ export async function POST(
       );
     }
 
+    const isFinalApproval =
+      payload.action === "ACC" && report.status === "MENUNGGU_ADMIN_5";
+    let completionProofUrl: string | null = null;
+
+    if (isFinalApproval) {
+      const proofValidationError = validateReportAttachmentUpload(
+        payload.proofFile,
+        { required: true },
+      );
+
+      if (proofValidationError) {
+        return NextResponse.json(
+          { message: proofValidationError },
+          { status: 400 },
+        );
+      }
+
+      try {
+        completionProofUrl = await saveReportAttachmentUpload(payload.proofFile!, {
+          folder: "uploads",
+        });
+      } catch (error) {
+        return NextResponse.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Bukti penyelesaian tidak valid.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const fromStatus = report.status;
     const toStatus =
       payload.action === "ACC"
         ? getNextApprovedStatus(report.status)
         : getRejectedStatus();
 
-    await prisma.$transaction(async (tx) => {
-      await tx.report.update({
-        where: { id: reportId },
-        data: {
-          status: toStatus,
-          alasanPenolakan: payload.action === "TOLAK" ? payload.note : null,
+    try {
+      await prisma.$transaction(async (tx) => {
+        const finalDate = toStatus === "DISETUJUI_FINAL" ? new Date() : null;
 
-          approvedAt:
-            toStatus === "DISETUJUI_FINAL"
-              ? new Date()
-              : report.approvedAt,
+        await tx.report.update({
+          where: { id: reportId },
+          data: {
+            status: toStatus,
+            alasanPenolakan: payload.action === "TOLAK" ? payload.note : null,
 
-          rejectedAt:
-            payload.action === "TOLAK"
-              ? new Date()
-              : null,
+            approvedAt: finalDate || report.approvedAt,
 
-          adminNotes: payload.note || report.adminNotes || null,
+            rejectedAt:
+              payload.action === "TOLAK"
+                ? new Date()
+                : null,
 
-          // Field lama dibiarkan null supaya workflow baru tidak pakai proses/selesai manual.
-          assignedTechnician: null,
-          processedAt: null,
-          finishedAt: null,
-          completionNotes: null,
-          completionPhotoUrl: null,
-        },
+            adminNotes: payload.note || report.adminNotes || null,
+
+            // Field lama dipakai sebagai bukti penyelesaian final dari PP.
+            assignedTechnician: null,
+            processedAt: null,
+            finishedAt: finalDate,
+            completionNotes: finalDate ? payload.note || null : null,
+            completionPhotoUrl: finalDate ? completionProofUrl : null,
+          },
+        });
+
+        await tx.reportApprovalHistory.create({
+          data: {
+            reportId,
+            adminId: authUser.id,
+            action: payload.action,
+            fromStatus,
+            toStatus,
+            note: payload.note || null,
+          },
+        });
       });
-
-      await tx.reportApprovalHistory.create({
-        data: {
-          reportId,
-          adminId: authUser.id,
-          action: payload.action,
-          fromStatus,
-          toStatus,
-          note: payload.note || null,
-        },
-      });
-    });
+    } catch (error) {
+      await deleteUploadedFileByUrl(completionProofUrl);
+      throw error;
+    }
 
     const updated = await findReportByIdRaw(reportId);
 
@@ -237,7 +320,7 @@ export async function POST(
       message:
         payload.action === "ACC"
           ? toStatus === "DISETUJUI_FINAL"
-            ? "Laporan berhasil disetujui final."
+            ? "Laporan berhasil diselesaikan."
             : `Laporan berhasil di-ACC dan diteruskan ke ${toStatus}.`
           : "Laporan berhasil ditolak dan alur berhenti permanen.",
       report: updated,
