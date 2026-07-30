@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
@@ -23,6 +22,10 @@ import {
   type ReportKategori,
   type ReportStatus,
 } from "@/lib/report-helpers";
+import {
+  IN_PROGRESS_STATUS_FILTER,
+  isInProgressStatus,
+} from "@/src/lib/report-status-filters";
 import {
   ADMIN_ROLES,
   getCategoryScopeLabel,
@@ -81,6 +84,7 @@ type ReportItem = {
   createdAt: string;
   approvedAt?: string | null;
   rejectedAt?: string | null;
+  finishedAt?: string | null;
   histories?: ReportHistoryItem[];
   user: {
     id: number;
@@ -105,6 +109,18 @@ const CATEGORY_FILTER_OPTIONS: AppCategoryScope[] = [
   "FASILITAS_INVENTARIS",
   "IT_ELEKTRONIK",
   "LABORATORIUM",
+];
+const STATUS_FILTER_OPTIONS: ReportStatus[] = [
+  "MENUNGGU_ADMIN_1",
+  "MENUNGGU_ADMIN_2",
+  "MENUNGGU_ADMIN_3",
+  "MENUNGGU_ADMIN_4",
+  "MENUNGGU_ADMIN_5",
+  "MENUNGGU_KONFIRMASI",
+  "DISETUJUI_FINAL",
+  "TELAH_BERFUNGSI",
+  "TIDAK_DAPAT_DIGUNAKAN",
+  "DITOLAK",
 ];
 const EXPORT_FIELD_OPTIONS = [
   { key: "id", label: "Tiket" },
@@ -132,12 +148,13 @@ const ROW_RENDER_CONTAINMENT: CSSProperties = {
   containIntrinsicSize: "76px",
 };
 
-function isHistoryStatus(status: ReportStatus) {
-  return status === "DISETUJUI_FINAL" || status === "DITOLAK";
-}
-
-function getFinalDate(report: ReportItem) {
-  return report.rejectedAt || report.approvedAt || report.createdAt;
+function getReportStatusDate(report: ReportItem) {
+  return (
+    report.finishedAt ||
+    report.rejectedAt ||
+    report.approvedAt ||
+    report.createdAt
+  );
 }
 
 function isPdfAttachment(report: ReportItem) {
@@ -176,6 +193,7 @@ function getReportAttachments(report: ReportItem) {
     .map((attachment, index) => ({
       id: attachment.id,
       url: attachment.url,
+      downloadUrl: `/api/reports/${report.id}/attachments/${attachment.id}/download`,
       fileType: attachment.fileType,
       fileName:
         attachment.fileName ||
@@ -199,6 +217,7 @@ function getReportAttachments(report: ReportItem) {
     {
       id: 0,
       url: legacyUrl,
+      downloadUrl: `/api/reports/${report.id}/attachments/legacy/download`,
       fileType: report.attachmentType || "image/*",
       fileName:
         report.attachmentName ||
@@ -223,7 +242,7 @@ function downloadAttachment(url: string, fileName: string) {
 function downloadReportAttachments(report: ReportItem) {
   getReportAttachments(report).forEach((attachment, index) => {
     window.setTimeout(() => {
-      downloadAttachment(attachment.url, attachment.fileName);
+      downloadAttachment(attachment.downloadUrl, attachment.fileName);
     }, index * 150);
   });
 }
@@ -239,13 +258,12 @@ function formatUserSearchLabel(user: UserSearchResult) {
 }
 
 export default function AdminHistoryPage() {
-  const router = useRouter();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-    "SEMUA" | "DISETUJUI_FINAL" | "DITOLAK"
+    ReportStatus | "SEMUA" | typeof IN_PROGRESS_STATUS_FILTER
   >("SEMUA");
   const [userQuery, setUserQuery] = useState("");
   const [debouncedUserQuery, setDebouncedUserQuery] = useState("");
@@ -280,18 +298,26 @@ export default function AdminHistoryPage() {
         cache: "no-store",
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const text = data.message || "Gagal memuat riwayat laporan.";
+        const text = data?.message || "Gagal memuat riwayat laporan.";
         setMessage(toFeedback(text, "error"));
         showError("Gagal memuat riwayat", text);
         return;
       }
 
-      setReports((data.reports || []).filter((item: ReportItem) =>
-        isHistoryStatus(item.status),
-      ));
+      if (!data || !Array.isArray(data.reports)) {
+        throw new Error("Respons riwayat laporan tidak valid.");
+      }
+
+      setReports(
+        data.reports.map((report: ReportItem) => ({
+          ...report,
+          histories: Array.isArray(report.histories) ? report.histories : [],
+          attachments: Array.isArray(report.attachments) ? report.attachments : [],
+        })),
+      );
     } catch (error) {
       console.error("LOAD_ADMIN_HISTORY_ERROR:", error);
       const text = "Terjadi kesalahan saat memuat riwayat laporan.";
@@ -397,9 +423,12 @@ export default function AdminHistoryPage() {
 
       const params = new URLSearchParams();
 
-      params.set("historyOnly", "true");
       if (debouncedSearchTerm.trim()) params.set("q", debouncedSearchTerm.trim());
-      if (statusFilter !== "SEMUA") params.set("status", statusFilter);
+      if (statusFilter === IN_PROGRESS_STATUS_FILTER) {
+        params.set("status", IN_PROGRESS_STATUS_FILTER);
+      } else if (statusFilter !== "SEMUA") {
+        params.set("status", statusFilter);
+      }
       if (selectedExportUser) {
         params.set("userId", String(selectedExportUser.id));
       } else if (debouncedUserQuery.trim()) {
@@ -454,7 +483,10 @@ export default function AdminHistoryPage() {
 
     return reports.filter((report) => {
       const matchesStatus =
-        statusFilter === "SEMUA" || report.status === statusFilter;
+        statusFilter === "SEMUA" ||
+        (statusFilter === IN_PROGRESS_STATUS_FILTER
+          ? isInProgressStatus(report.status)
+          : report.status === statusFilter);
       const normalizedUserQuery = debouncedUserQuery.trim().toLowerCase();
       const matchesUser =
         selectedExportUser
@@ -471,11 +503,11 @@ export default function AdminHistoryPage() {
       const matchesRejectedByRole =
         rejectedByRoleFilter === "SEMUA" ||
         rejectingAdmin?.role === rejectedByRoleFilter;
-      const finalDate = new Date(getFinalDate(report));
+      const statusDate = new Date(getReportStatusDate(report));
       const matchesDateFrom =
-        !dateFromFilter || finalDate >= new Date(`${dateFromFilter}T00:00:00`);
+        !dateFromFilter || statusDate >= new Date(`${dateFromFilter}T00:00:00`);
       const matchesDateTo =
-        !dateToFilter || finalDate <= new Date(`${dateToFilter}T23:59:59`);
+        !dateToFilter || statusDate <= new Date(`${dateToFilter}T23:59:59`);
 
       if (
         !matchesStatus ||
@@ -524,6 +556,9 @@ export default function AdminHistoryPage() {
   const approvedFinalCount = reports.filter(
     (report) => report.status === "DISETUJUI_FINAL",
   ).length;
+  const ongoingCount = reports.filter((report) =>
+    isInProgressStatus(report.status),
+  ).length;
   const rejectedCount = reports.filter(
     (report) => report.status === "DITOLAK",
   ).length;
@@ -564,20 +599,20 @@ export default function AdminHistoryPage() {
         <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">
-              Admin Panel
+              Panel Admin
             </p>
             <h1 className="mt-2 text-3xl font-bold text-slate-950 md:text-4xl">
               Riwayat Laporan
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Arsip laporan yang sudah disetujui final atau ditolak.
+              Seluruh laporan aktif dan final dalam satu riwayat.
             </p>
           </div>
 
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
             <button
               type="button"
-              onClick={() => router.push("/dashboard/admin")}
+              onClick={() => window.location.assign("/dashboard/admin")}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 shadow-sm transition hover:bg-blue-50"
             >
               <ArrowLeft className="h-4 w-4 text-blue-600" />
@@ -596,12 +631,18 @@ export default function AdminHistoryPage() {
           </div>
         </div>
 
-        <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
-            label="Total Riwayat"
+            label="Total Laporan"
             value={reports.length}
-            description="Semua arsip final."
+            description="Semua laporan aktif dan final."
             colorClass="text-blue-600"
+          />
+          <SummaryCard
+            label="Dalam Proses"
+            value={ongoingCount}
+            description="Sedang diproses atau menunggu konfirmasi."
+            colorClass="text-cyan-600"
           />
           <SummaryCard
             label="Disetujui Final"
@@ -625,7 +666,7 @@ export default function AdminHistoryPage() {
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">
-                    Arsip Laporan
+                    Daftar Laporan
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
                     Menampilkan {pagedReports.length} dari{" "}
@@ -654,16 +695,20 @@ export default function AdminHistoryPage() {
                     onChange={(event) =>
                       setStatusFilter(
                         event.target.value as
+                          | ReportStatus
                           | "SEMUA"
-                          | "DISETUJUI_FINAL"
-                          | "DITOLAK",
+                          | typeof IN_PROGRESS_STATUS_FILTER,
                       )
                     }
                     className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:min-w-[190px]"
                   >
                     <option value="SEMUA">Semua Status</option>
-                    <option value="DISETUJUI_FINAL">Disetujui Final</option>
-                    <option value="DITOLAK">Ditolak</option>
+                    <option value={IN_PROGRESS_STATUS_FILTER}>Dalam Proses</option>
+                    {STATUS_FILTER_OPTIONS.map((status) => (
+                      <option key={status} value={status}>
+                        {formatStatus(status)}
+                      </option>
+                    ))}
                   </select>
 
                   <button
@@ -787,7 +832,7 @@ export default function AdminHistoryPage() {
                     value={dateFromFilter}
                     onChange={(event) => setDateFromFilter(event.target.value)}
                     className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                    aria-label="Tanggal final mulai"
+                    aria-label="Tanggal status mulai"
                   />
 
                   <input
@@ -795,7 +840,7 @@ export default function AdminHistoryPage() {
                     value={dateToFilter}
                     onChange={(event) => setDateToFilter(event.target.value)}
                     className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                    aria-label="Tanggal final akhir"
+                    aria-label="Tanggal status akhir"
                   />
 
                   <div className="md:col-span-2 xl:col-span-5">
@@ -847,11 +892,11 @@ export default function AdminHistoryPage() {
 
           {loading ? (
             <div className="px-5 py-8 text-slate-600">
-              Memuat riwayat laporan...
+              Memuat laporan...
             </div>
           ) : visibleReports.length === 0 ? (
             <div className="px-5 py-8 text-slate-600">
-              Tidak ada riwayat laporan yang cocok.
+              Tidak ada laporan yang cocok.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-b-2xl">
@@ -872,7 +917,7 @@ export default function AdminHistoryPage() {
                     <TableHead>Barang</TableHead>
                     <TableHead>Kode Ruangan</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Tanggal Final</TableHead>
+                    <TableHead>Tanggal Status</TableHead>
                     <TableHead align="right">Aksi</TableHead>
                   </tr>
                 </thead>
@@ -886,7 +931,7 @@ export default function AdminHistoryPage() {
                     >
                       <td className="px-5 py-4">
                         <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-sm font-bold tracking-wide text-blue-700">
-                          LP-{String(report.id).padStart(4, "0")}
+                          {getHistoryTicket(report)}
                         </span>
                       </td>
                       <td className="px-5 py-4">
@@ -922,7 +967,7 @@ export default function AdminHistoryPage() {
                       <td className="px-5 py-4 text-sm text-slate-600">
                         <span className="inline-flex items-center gap-2">
                           <CalendarDays className="h-4 w-4 text-slate-400" />
-                          {formatTanggal(getFinalDate(report))}
+                          {formatTanggal(getReportStatusDate(report))}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
@@ -993,7 +1038,7 @@ function ReportDetailModal({
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-sm font-bold tracking-wide text-blue-700">
-                LP-{String(report.id).padStart(4, "0")}
+                {getHistoryTicket(report)}
               </span>
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold tracking-[0.12em] ${getStatusClass(
@@ -1093,7 +1138,7 @@ function ReportDetailModal({
                         </p>
                       </div>
                       <p className="mt-1 text-slate-600">
-                        {history.action}: {formatStatus(history.fromStatus)} -{" "}
+                        {history.action === "TOLAK" ? "Tolak" : "Terima"}: {formatStatus(history.fromStatus)} -{" "}
                         {formatStatus(history.toStatus)}
                       </p>
                       {history.note ? (
@@ -1179,7 +1224,7 @@ function ReportDetailModal({
                       <button
                         type="button"
                         onClick={() =>
-                          downloadAttachment(attachment.url, attachment.fileName)
+                          downloadAttachment(attachment.downloadUrl, attachment.fileName)
                         }
                         className="inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg border border-blue-100 bg-white px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
                       >

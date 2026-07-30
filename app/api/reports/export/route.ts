@@ -11,7 +11,7 @@ import {
   type AppCategoryScope,
   type AppRole,
 } from "@/src/lib/roles";
-import { canAdminAccessReport } from "@/src/lib/workflow";
+import { canAdminAccessReport, getRequiredAdminRole } from "@/src/lib/workflow";
 import {
   formatKategori,
   formatStatus,
@@ -19,6 +19,10 @@ import {
   type ReportStatus,
 } from "@/lib/report-helpers";
 import { formatTicketFallback } from "@/src/lib/tickets";
+import {
+  IN_PROGRESS_STATUS_FILTER,
+  isInProgressStatus,
+} from "@/src/lib/report-status-filters";
 
 const EXPORTABLE_ROLES: AppRole[] = ["USER", ...ADMIN_ROLES, "SUPER_ADMIN", "EXECUTIVE"];
 const EXPORTABLE_CATEGORIES: AppCategoryScope[] = [
@@ -44,7 +48,6 @@ const EXPORT_COLUMNS = [
   { header: "NIP Pelapor", key: "nipPelapor", width: 22 },
   { header: "Jenis Perbaikan", key: "kategori", width: 24 },
   { header: "Subkategori", key: "subcategory", width: 20 },
-  { header: "Tipe Barang", key: "itemType", width: 24 },
   { header: "Nama Barang", key: "namaBarang", width: 24 },
   { header: "Kode Ruangan", key: "kodeRuangan", width: 18 },
   { header: "Lokasi", key: "lokasi", width: 22 },
@@ -66,12 +69,25 @@ const EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map((column) => column.key);
 
 type ReportExportFilter = {
   search: string;
-  status: ReportStatus | "SEMUA";
+  status:
+    | ReportStatus
+    | "SEMUA"
+    | typeof IN_PROGRESS_STATUS_FILTER
+    | "TIDAK_VALID";
   historyOnly: boolean;
   userId: number | null;
   userQuery: string;
   category: AppCategoryScope | "SEMUA";
   subcategory: string;
+  room: string;
+  responsibleRole: AppRole | "SEMUA";
+  processState:
+    | "SEMUA"
+    | "UNFINISHED"
+    | "COMPLETED"
+    | "ACCEPTED"
+    | "REJECTED"
+    | "ONGOING";
   rejectedByRole: AppRole | "SEMUA";
   budget: "SEMUA" | "BELOW_5" | "BETWEEN_5_10" | "ABOVE_10" | "CUSTOM";
   budgetMin: number | null;
@@ -121,12 +137,21 @@ function parseCategory(value: string | null): AppCategoryScope | "SEMUA" {
     : "SEMUA";
 }
 
-function parseStatus(value: string | null): ReportStatus | "SEMUA" {
+function parseStatus(
+  value: string | null,
+):
+  | ReportStatus
+  | "SEMUA"
+  | typeof IN_PROGRESS_STATUS_FILTER
+  | "TIDAK_VALID" {
   if (!value || value === "SEMUA") return "SEMUA";
+  if (value === IN_PROGRESS_STATUS_FILTER || value === "BERJALAN") {
+    return IN_PROGRESS_STATUS_FILTER;
+  }
 
   return EXPORTABLE_STATUSES.includes(value as ReportStatus)
     ? (value as ReportStatus)
-    : "SEMUA";
+    : "TIDAK_VALID";
 }
 
 function parseNumber(value: string | null) {
@@ -167,6 +192,16 @@ function parseExportFilter(req: Request): ReportExportFilter {
     userQuery: (url.searchParams.get("userQuery") || "").trim().toLowerCase(),
     category: parseCategory(url.searchParams.get("category")),
     subcategory: (url.searchParams.get("subcategory") || "").trim(),
+    room: (url.searchParams.get("room") || "").trim().toLowerCase(),
+    responsibleRole: parseRole(url.searchParams.get("responsibleRole")),
+    processState:
+      url.searchParams.get("processState") === "UNFINISHED" ||
+      url.searchParams.get("processState") === "COMPLETED" ||
+      url.searchParams.get("processState") === "ACCEPTED" ||
+      url.searchParams.get("processState") === "REJECTED" ||
+      url.searchParams.get("processState") === "ONGOING"
+        ? (url.searchParams.get("processState") as ReportExportFilter["processState"])
+        : "SEMUA",
     rejectedByRole: parseRole(url.searchParams.get("rejectedByRole")),
     budget: parseBudget(url.searchParams.get("budget")),
     budgetMin: parseNumber(url.searchParams.get("budgetMin")),
@@ -181,7 +216,20 @@ function reportMatchesFilter(
   report: Awaited<ReturnType<typeof listReportsRaw>>[number],
   filter: ReportExportFilter,
 ) {
-  if (filter.status !== "SEMUA" && report.status !== filter.status) return false;
+  if (filter.status === "TIDAK_VALID") return false;
+  if (
+    filter.status === IN_PROGRESS_STATUS_FILTER &&
+    !isInProgressStatus(report.status)
+  ) {
+    return false;
+  }
+  if (
+    filter.status !== "SEMUA" &&
+    filter.status !== IN_PROGRESS_STATUS_FILTER &&
+    report.status !== filter.status
+  ) {
+    return false;
+  }
   if (
     filter.historyOnly &&
     filter.status === "SEMUA" &&
@@ -206,6 +254,47 @@ function reportMatchesFilter(
     return false;
   }
   if (filter.subcategory && report.subcategory !== filter.subcategory) {
+    return false;
+  }
+  if (
+    filter.room &&
+    ![report.namaRuangan, report.nomorRuangan, report.lokasi]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(filter.room)
+  ) {
+    return false;
+  }
+  if (
+    filter.responsibleRole !== "SEMUA" &&
+    getRequiredAdminRole(report.status) !== filter.responsibleRole
+  ) {
+    return false;
+  }
+
+  if (
+    filter.processState === "UNFINISHED" &&
+    ["TELAH_BERFUNGSI", "TIDAK_DAPAT_DIGUNAKAN", "DITOLAK"].includes(report.status)
+  ) {
+    return false;
+  }
+  if (
+    filter.processState === "COMPLETED" &&
+    !["TELAH_BERFUNGSI", "TIDAK_DAPAT_DIGUNAKAN"].includes(report.status)
+  ) {
+    return false;
+  }
+  if (filter.processState === "ACCEPTED" && report.status !== "TELAH_BERFUNGSI") {
+    return false;
+  }
+  if (filter.processState === "REJECTED" && report.status !== "DITOLAK") {
+    return false;
+  }
+  if (
+    filter.processState === "ONGOING" &&
+    !isInProgressStatus(report.status)
+  ) {
     return false;
   }
 
@@ -245,7 +334,6 @@ function reportMatchesFilter(
       report.nup,
       report.ticket,
       report.subcategory,
-      report.itemType,
       report.lokasi,
       formatKategori(report.kategori),
       getCategoryScopeLabel(report.kategori),
@@ -269,7 +357,9 @@ function getHistorySummary(
     .map((history) => {
       const note = history.note ? ` | Catatan: ${history.note}` : "";
 
-      return `${formatTanggal(history.createdAt)} - ${history.admin.nama} (${getRoleLabel(history.admin.role)}) ${history.action}: ${formatStatus(history.fromStatus)} -> ${formatStatus(history.toStatus)}${note}`;
+      const actionLabel = history.action === "TOLAK" ? "Tolak" : "Terima";
+
+      return `${formatTanggal(history.createdAt)} - ${history.admin.nama} (${getRoleLabel(history.admin.role)}) ${actionLabel}: ${formatStatus(history.fromStatus)} -> ${formatStatus(history.toStatus)}${note}`;
     })
     .join("\n");
 }
@@ -359,6 +449,10 @@ export async function GET(req: Request) {
     }
 
     const filter = parseExportFilter(req);
+    if (filter.status === "TIDAK_VALID") {
+      return exportErrorResponse(req, "Filter status tidak valid.", 400);
+    }
+
     const canSeeAllCategories = hasSuperAdminAccess(authUser);
     const reports = (await listReportsRaw()).filter(
       (report) =>
@@ -405,7 +499,6 @@ export async function GET(req: Request) {
         nipPelapor: report.user.nip || "-",
         kategori: formatKategori(report.kategori),
         subcategory: report.subcategory || "-",
-        itemType: report.itemType || "-",
         namaBarang: report.namaBarang,
         kodeRuangan: report.nomorRuangan || "-",
         lokasi: report.namaRuangan || report.lokasi,

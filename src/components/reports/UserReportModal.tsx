@@ -7,6 +7,7 @@ import { FileText, RefreshCcw, Send, Upload, X } from "lucide-react";
 import { showError } from "@/src/components/ui/feedback";
 import {
   CATEGORY_MASTER,
+  getUniqueSubcategories,
   ROOM_MASTER,
   type CategoryMaster,
   type RoomMaster,
@@ -35,7 +36,6 @@ export type UserReportModalPayload = {
   kode: string;
   nup: string;
   subcategory: string;
-  itemType: string;
   namaBarang: string;
   repairCost: string;
   deskripsi: string;
@@ -53,11 +53,11 @@ type UserReportModalProps = {
   defaultKode?: string;
   defaultNup?: string;
   defaultSubcategory?: string;
-  defaultItemType?: string;
   defaultNamaBarang?: string;
   defaultRepairCost?: string;
   defaultDeskripsi?: string;
   defaultKategori?: UserReportCategory;
+  attachmentRequired?: boolean;
   submitLabel?: string;
 };
 
@@ -76,7 +76,10 @@ function RequiredMark() {
   );
 }
 
-function validateForm(payload: UserReportModalPayload) {
+function validateForm(
+  payload: UserReportModalPayload,
+  attachmentRequired: boolean,
+) {
   const errors: FormErrors = {};
 
   if (!payload.namaPelapor.trim()) {
@@ -108,17 +111,15 @@ function validateForm(payload: UserReportModalPayload) {
     errors.subcategory = "Subkategori wajib dipilih.";
   }
 
-  if (!payload.itemType.trim()) {
-    errors.itemType = "Tipe barang wajib dipilih.";
-  }
-
   if (!payload.deskripsi.trim()) {
     errors.deskripsi = "Deskripsi wajib diisi.";
   } else if (payload.deskripsi.trim().length > 2000) {
     errors.deskripsi = "Deskripsi maksimal 2000 karakter.";
   }
 
-  if (payload.attachments.length > MAX_ATTACHMENT_COUNT) {
+  if (attachmentRequired && payload.attachments.length === 0) {
+    errors.attachments = "Lampiran wajib diunggah.";
+  } else if (payload.attachments.length > MAX_ATTACHMENT_COUNT) {
     errors.attachments = `Lampiran maksimal ${MAX_ATTACHMENT_COUNT} file.`;
   }
 
@@ -146,11 +147,11 @@ export default function UserReportModal({
   defaultKode = "",
   defaultNup = "",
   defaultSubcategory = "",
-  defaultItemType = "",
   defaultNamaBarang = "",
   defaultRepairCost = "",
   defaultDeskripsi = "",
   defaultKategori = "FASILITAS_INVENTARIS",
+  attachmentRequired = true,
   submitLabel = "Kirim Laporan",
 }: UserReportModalProps) {
   const titleId = useId();
@@ -170,7 +171,6 @@ export default function UserReportModal({
   const [subcategory, setSubcategory] = useState(
     defaultSubcategory || "",
   );
-  const [itemType, setItemType] = useState(defaultItemType || "");
   const [namaBarang, setNamaBarang] = useState(defaultNamaBarang || defaultKodeUakpb);
   const [repairCost, setRepairCost] = useState(defaultRepairCost);
   const [deskripsi, setDeskripsi] = useState(defaultDeskripsi);
@@ -189,7 +189,6 @@ export default function UserReportModal({
     setKode(defaultKode);
     setNup(defaultNup);
     setSubcategory(defaultSubcategory || "");
-    setItemType(defaultItemType || "");
     setNamaBarang(defaultNamaBarang || defaultKodeUakpb);
     setRepairCost(defaultRepairCost);
     setDeskripsi(defaultDeskripsi);
@@ -202,7 +201,6 @@ export default function UserReportModal({
     defaultNup,
     defaultRepairCost,
     defaultSubcategory,
-    defaultItemType,
     defaultDeskripsi,
     defaultNamaPelapor,
     defaultNomorRuangan,
@@ -272,14 +270,7 @@ export default function UserReportModal({
     };
   }, [attachments]);
 
-  const selectedCategory =
-    masterData.categories.find((item) => item.value === kategori) ||
-    masterData.categories[0] ||
-    CATEGORY_MASTER[0];
-  const selectedSubcategory =
-    selectedCategory.subcategories.find((item) => item.name === subcategory) ||
-    null;
-
+  const subcategoryOptions = getUniqueSubcategories(masterData.categories);
   if (!open) {
     return null;
   }
@@ -293,7 +284,6 @@ export default function UserReportModal({
     kode,
     nup,
     subcategory,
-    itemType,
     namaBarang,
     repairCost,
     deskripsi,
@@ -304,7 +294,7 @@ export default function UserReportModal({
     event.preventDefault();
     setSubmitError("");
 
-    const nextErrors = validateForm(payload);
+    const nextErrors = validateForm(payload, attachmentRequired);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -327,7 +317,6 @@ export default function UserReportModal({
         kode: payload.kode.trim(),
         nup: payload.nup.trim(),
         subcategory: payload.subcategory.trim(),
-        itemType: payload.itemType.trim(),
         namaBarang: payload.namaBarang.trim(),
         repairCost: payload.repairCost.replace(/\D/g, ""),
         deskripsi: payload.deskripsi.trim(),
@@ -358,11 +347,19 @@ export default function UserReportModal({
     setAttachments(files);
 
     if (files.length === 0) {
-      setErrors((current) => ({ ...current, attachments: undefined }));
+      setErrors((current) => ({
+        ...current,
+        attachments: attachmentRequired
+          ? "Lampiran wajib diunggah."
+          : undefined,
+      }));
       return;
     }
 
-    const nextErrors = validateForm({ ...payload, attachments: files });
+    const nextErrors = validateForm(
+      { ...payload, attachments: files },
+      attachmentRequired,
+    );
     setErrors((current) => ({
       ...current,
       attachments: nextErrors.attachments,
@@ -384,13 +381,10 @@ export default function UserReportModal({
 
   function handleCategoryChange(value: UserReportCategory) {
     setKategori(value);
-    setSubcategory("");
-    setItemType("");
   }
 
   function handleSubcategoryChange(value: string) {
     setSubcategory(value);
-    setItemType("");
   }
 
   return (
@@ -519,28 +513,12 @@ export default function UserReportModal({
                 required
               >
                 <option value="">Pilih subkategori</option>
-                {selectedCategory.subcategories.map((item) => (
+                {subcategoryOptions.map((item) => (
                   <option key={item.code} value={item.name}>
                     {item.name}
                   </option>
                 ))}
               </select>
-            </Field>
-
-            <Field label="Nama / Tipe Barang" required error={errors.itemType}>
-              <input
-                value={itemType}
-                list="item-type-master-list"
-                onChange={(event) => setItemType(event.target.value)}
-                className="h-12 w-full rounded-md border border-slate-300 bg-white px-4 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                placeholder="Pilih atau ketik tipe barang"
-                required
-              />
-              <datalist id="item-type-master-list">
-                {selectedSubcategory?.itemTypes.map((item) => (
-                  <option key={item.code} value={item.name} />
-                ))}
-              </datalist>
             </Field>
 
             <Field
@@ -593,7 +571,8 @@ export default function UserReportModal({
             </Field>
 
             <Field
-              label="Lampiran (opsional)"
+              label={attachmentRequired ? "Lampiran" : "Lampiran tambahan (opsional)"}
+              required={attachmentRequired}
               error={errors.attachments}
               className="md:col-span-2"
             >
@@ -610,6 +589,7 @@ export default function UserReportModal({
                   accept="image/*,application/pdf"
                   multiple
                   onChange={handleAttachmentChange}
+                  required={attachmentRequired}
                   className="sr-only"
                 />
               </label>
@@ -628,6 +608,7 @@ export default function UserReportModal({
                         accept="image/*,application/pdf"
                         multiple
                         onChange={handleAttachmentChange}
+                        required={attachmentRequired}
                         className="sr-only"
                       />
                     </label>
@@ -653,11 +634,19 @@ export default function UserReportModal({
 
                         <button
                           type="button"
-                          onClick={() =>
-                            setAttachments((current) =>
-                              current.filter((item) => item !== attachment),
-                            )
-                          }
+                          onClick={() => {
+                            const nextAttachments = attachments.filter(
+                              (item) => item !== attachment,
+                            );
+                            setAttachments(nextAttachments);
+                            setErrors((current) => ({
+                              ...current,
+                              attachments:
+                                attachmentRequired && nextAttachments.length === 0
+                                  ? "Lampiran wajib diunggah."
+                                  : undefined,
+                            }));
+                          }}
                           className="inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
                           aria-label="Hapus lampiran"
                         >

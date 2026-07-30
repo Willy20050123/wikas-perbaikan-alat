@@ -115,23 +115,23 @@ export const CATEGORY_MASTER: CategoryMaster[] = [
 export const MESSAGE_TEMPLATE_MASTER = [
   {
     type: "APPROVAL",
-    title: "Persetujuan",
-    body: "Laporan diterima dan dapat dilanjutkan ke tahap berikutnya.",
+    name: "Persetujuan",
+    description: "Laporan diterima dan dapat dilanjutkan ke tahap berikutnya.",
   },
   {
     type: "REJECTION",
-    title: "Penolakan",
-    body: "Laporan ditolak karena data atau kondisi belum memenuhi persyaratan.",
+    name: "Penolakan",
+    description: "Laporan ditolak karena data atau kondisi belum memenuhi persyaratan.",
   },
   {
     type: "NOTES",
-    title: "Catatan",
-    body: "Mohon lengkapi informasi tambahan agar proses dapat dilanjutkan.",
+    name: "Catatan",
+    description: "Mohon lengkapi informasi tambahan agar proses dapat dilanjutkan.",
   },
   {
     type: "COMPLETION",
-    title: "Penyelesaian",
-    body: "Perbaikan telah selesai dilakukan. Mohon pelapor melakukan konfirmasi penerimaan barang.",
+    name: "Penyelesaian",
+    description: "Perbaikan telah selesai dilakukan. Mohon pelapor melakukan konfirmasi penerimaan barang.",
   },
 ] as const;
 
@@ -151,4 +151,22 @@ export function getCategoryTicketCode(category: AppCategoryScope) {
 
 export function getCategoryMaster(category: AppCategoryScope) {
   return CATEGORY_MASTER.find((item) => item.value === category) || CATEGORY_MASTER[0];
+}
+
+export function getUniqueSubcategories(categories: CategoryMaster[]) {
+  const byName = new Map<string, SubcategoryMaster>();
+
+  for (const category of categories) {
+    for (const subcategory of category.subcategories) {
+      const key = subcategory.name.trim().toLocaleLowerCase("id-ID");
+
+      if (key && !byName.has(key)) {
+        byName.set(key, subcategory);
+      }
+    }
+  }
+
+  return Array.from(byName.values()).sort((left, right) =>
+    left.name.localeCompare(right.name, "id-ID"),
+  );
 }
